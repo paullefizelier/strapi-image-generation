@@ -104,6 +104,13 @@ from it have **no transparency** — for a cut-out subject on a clear background
 use Nano Banana 2, which accepts PNG. The plugin sends each model the format it
 declares and rejects a mismatch before spending anything.
 
+**Write the house style as a description, not an instruction.** The API has no
+system-instruction field, so the style travels inside the prompt — and a style
+that reads like an order ("write prompts for…", "you are an art director") is
+obeyed as one: the model answers with a written brief instead of an image.
+Describe the look — *photographic, direct flash, hard shadows, muted palette* —
+and it behaves. The plugin names this as the likely cause when it happens.
+
 **Every image carries a SynthID watermark.** It is invisible, it identifies the
 image as AI-generated, and Google provides no way to disable it. The dialog says
 so, because an editor publishing a client-facing visual should know.

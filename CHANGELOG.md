@@ -7,6 +7,17 @@ carry breaking changes.
 
 ## [Unreleased]
 
+## [0.2.3] — 2026-09-03
+
+### Changed
+
+- **A text answer now names the house style as the suspect.** The API has no
+  system-instruction field, so the style rides inside the prompt — and one
+  phrased as an order ("write prompts for…") is obeyed as an order: the model
+  returns a written brief and no image. The error says so, and the settings
+  field now teaches the right shape before the mistake happens.
+
+
 ## [0.2.2] — 2026-09-03
 
 ### Fixed
@@ -93,7 +104,8 @@ First release.
 - Strapi's Media Library page and asset picker cannot be extended — see the
   README for why, and what is done instead.
 
-[Unreleased]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.1.0...v0.2.0

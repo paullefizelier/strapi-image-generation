@@ -49,7 +49,7 @@
   "settings.section": "Image Gen",
   "settings.size": "Taille",
   "settings.style": "Style maison",
-  "settings.style-hint": "Ajouté devant chaque prompt, pour que les images générées partagent un même parti pris. L'Interactions API n'a pas de champ système : le style voyage donc dans le prompt lui-même — les éditeurs le voient et peuvent le désactiver image par image.",
+  "settings.style-hint": "DÉCRIVEZ le rendu — « photographique, flash direct, ombres dures, palette sourde ». N'écrivez pas une consigne : l'API n'a pas de champ système, le style voyage donc dans le prompt, et « génère des prompts pour… » est obéi comme un ordre — le modèle répond du texte au lieu de dessiner.",
   "settings.style-placeholder": "Photographique, lumière naturelle, palette sourde, sans texte.",
   "settings.subtitle": "Clé API Google et réglages par défaut hérités par les éditeurs.",
   "settings.test": "Tester",

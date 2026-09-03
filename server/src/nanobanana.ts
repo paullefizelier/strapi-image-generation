@@ -178,7 +178,11 @@ export function findText(body: unknown): string {
  * there is one — a provider that explains itself should not be flattened into
  * "generation failed".
  */
-export function parseResponse(body: unknown, status?: number): GeneratedImage {
+export function parseResponse(
+  body: unknown,
+  status?: number,
+  { styleApplied = false }: { styleApplied?: boolean } = {},
+): GeneratedImage {
   const root = rootOf(body);
   if (root.error?.message) throw new Error(root.error.message);
 
@@ -188,11 +192,17 @@ export function parseResponse(body: unknown, status?: number): GeneratedImage {
     // The model usually SAYS why it declined. Repeating its words beats a
     // guess about rewording the prompt.
     const said = findText(body);
-    throw new Error(
-      said
-        ? `The model answered without an image: ${said}`
-        : "The model returned no image and gave no reason. Try rewording the prompt.",
-    );
+    if (!said) {
+      throw new Error("The model returned no image and gave no reason. Try rewording the prompt.");
+    }
+    // A house style phrased as an instruction ("write prompts for…", "you are
+    // an art director") is obeyed as an instruction: the model writes instead
+    // of drawing. There is no system field to isolate it into, so the only
+    // cure is wording the style as a DESCRIPTION.
+    const hint = styleApplied
+      ? " The house style may be the cause: written as an instruction it is obeyed as one, and the model writes instead of drawing. Describe the look (\"photographic, direct flash, hard shadows\") rather than asking for prompts, or switch the style off for this image."
+      : "";
+    throw new Error(`The model answered with text instead of an image: ${said}${hint}`);
   }
 
   return {
@@ -258,5 +268,5 @@ export async function generateImage(
     const message = rootOf(body).error?.message;
     throw new Error(message || `Image API returned ${response.status}`);
   }
-  return parseResponse(body, response.status);
+  return parseResponse(body, response.status, { styleApplied: Boolean(options.style?.trim()) });
 }

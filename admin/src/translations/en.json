@@ -49,7 +49,7 @@
   "settings.section": "Image Gen",
   "settings.size": "Size",
   "settings.style": "House style",
-  "settings.style-hint": "Prepended to every prompt, so generated images share a look. The Interactions API has no system field, so it travels inside the prompt itself — editors see it and can switch it off per image.",
+  "settings.style-hint": "DESCRIBE the look — “photographic, direct flash, hard shadows, muted palette”. Do not write an instruction: the API has no system field, so the style travels inside the prompt, and “write prompts for…” is obeyed as an order — the model answers with text instead of drawing.",
   "settings.style-placeholder": "Photographic, natural light, muted palette, no text.",
   "settings.subtitle": "Google API key and the defaults editors inherit.",
   "settings.test": "Test",

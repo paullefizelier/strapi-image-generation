@@ -157,6 +157,22 @@ describe("reading the answer", () => {
     expect(findImage({ interaction: steps([{ type: "image", data: b64("y") }]) })?.data).toBe(b64("y"));
   });
 
+  it("names the house style as the suspect when one was applied", () => {
+    // A style phrased as an instruction is obeyed as one: the model writes a
+    // brief instead of drawing. There is no system field to isolate it into.
+    expect(() =>
+      parseResponse(steps([{ type: "text", text: "Voici les prompts…" }]), 200, {
+        styleApplied: true,
+      }),
+    ).toThrow(/house style may be the cause/);
+  });
+
+  it("does not blame a style that was not applied", () => {
+    expect(() =>
+      parseResponse(steps([{ type: "text", text: "Voici les prompts…" }]), 200),
+    ).toThrow(/^The model answered with text instead of an image: Voici les prompts…$/);
+  });
+
   it("repeats what the model SAID instead of guessing about the prompt", () => {
     // A refusal usually explains itself; echoing it beats "try rewording".
     expect(() =>

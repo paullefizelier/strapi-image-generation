@@ -219,7 +219,7 @@ const SettingsPage = () => {
                 name="stylePrompt"
                 hint={t(
                   "settings.style-hint",
-                  "Prepended to every prompt, so generated images share a look. The Interactions API has no system field, so it travels inside the prompt itself — editors see it and can switch it off per image.",
+                  "DESCRIBE the look — “photographic, direct flash, hard shadows, muted palette”. Do not write an instruction: the API has no system field, so the style travels inside the prompt, and “write prompts for…” is obeyed as an order — the model answers with text instead of drawing.",
                 )}
               >
                 <Field.Label>{t("settings.style", "House style")}</Field.Label>
