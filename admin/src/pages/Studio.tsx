@@ -4,12 +4,15 @@ import {
   Badge,
   Box,
   Button,
+  Dialog,
   Flex,
+  IconButton,
   Loader,
   Main,
   Typography,
 } from "@strapi/design-system";
-import { Layouts, Page } from "@strapi/strapi/admin";
+import { Trash } from "@strapi/icons";
+import { Layouts, Page, useNotification } from "@strapi/strapi/admin";
 import GenerateDialog from "../components/GenerateDialog";
 import { useImageGenApi } from "../api";
 import { getTranslation } from "../getTranslation";
@@ -25,6 +28,7 @@ import type { JournalEntry, PublicSettings } from "../types";
 const Studio = () => {
   const { formatMessage } = useIntl();
   const api = useImageGenApi();
+  const { toggleNotification } = useNotification();
 
   const t = (id: string, defaultMessage: string, values?: Record<string, string | number>) =>
     formatMessage({ id: getTranslation(id), defaultMessage }, values);
@@ -34,6 +38,12 @@ const Studio = () => {
   const [settings, setSettings] = React.useState<PublicSettings | null>(null);
   const [entries, setEntries] = React.useState<JournalEntry[]>([]);
   const [spent, setSpent] = React.useState(0);
+  const [deleting, setDeleting] = React.useState<number | null>(null);
+
+  // Deleted images leave the list but stay in the count and the total: the
+  // asset is gone, the money was still spent.
+  const visible = React.useMemo(() => entries.filter((entry) => !entry.deletedAt), [entries]);
+  const deletedCount = entries.length - visible.length;
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -51,6 +61,31 @@ const Studio = () => {
   React.useEffect(() => {
     void load();
   }, [load]);
+
+  const remove = async (entry: JournalEntry) => {
+    setDeleting(entry.fileId);
+    try {
+      await api.deleteGenerated(entry.fileId);
+      setEntries((current) =>
+        current.map((item) =>
+          item.fileId === entry.fileId ? { ...item, deletedAt: new Date().toISOString() } : item,
+        ),
+      );
+      toggleNotification({
+        type: "success",
+        message: t("studio.deleted", "“{name}” has been deleted", { name: entry.fileName }),
+      });
+    } catch (err) {
+      toggleNotification({
+        type: "danger",
+        message:
+          (err as { response?: { data?: { error?: { message?: string } } } }).response?.data?.error
+            ?.message ?? t("studio.delete-failed", "The image could not be deleted"),
+      });
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   return (
     <Main>
@@ -88,6 +123,11 @@ const Studio = () => {
             <Flex gap={3} alignItems="center" wrap="wrap">
               <Badge>{t("studio.count", "{count} generated", { count: entries.length })}</Badge>
               <Badge>{t("studio.spent", "${amount} spent", { amount: spent.toFixed(2) })}</Badge>
+              {deletedCount ? (
+                <Badge>
+                  {t("studio.deleted-count", "{count} deleted", { count: deletedCount })}
+                </Badge>
+              ) : null}
               {settings ? (
                 <Typography variant="pi" textColor="neutral600">
                   {t("studio.folder", "Saved to “{folder}”", { folder: settings.folderName })}
@@ -95,7 +135,7 @@ const Studio = () => {
               ) : null}
             </Flex>
 
-            {entries.length === 0 ? (
+            {visible.length === 0 ? (
               <Page.NoData
                 action={
                   <Button onClick={() => setOpen(true)} disabled={!settings?.configured}>
@@ -105,7 +145,7 @@ const Studio = () => {
               />
             ) : (
               <Flex direction="column" alignItems="stretch" gap={2}>
-                {entries.map((entry) => (
+                {visible.map((entry) => (
                   <Box
                     key={`${entry.fileId}-${entry.at}`}
                     padding={3}
@@ -145,6 +185,47 @@ const Studio = () => {
                             : ""}
                         </Typography>
                       </Flex>
+
+                      <Dialog.Root>
+                        <Dialog.Trigger>
+                          <IconButton
+                            label={t("studio.delete", "Delete this image")}
+                            variant="ghost"
+                            disabled={deleting === entry.fileId}
+                          >
+                            <Trash />
+                          </IconButton>
+                        </Dialog.Trigger>
+                        <Dialog.Content>
+                          <Dialog.Header>
+                            {t("studio.delete-title", "Delete this image?")}
+                          </Dialog.Header>
+                          <Dialog.Body>
+                            {t(
+                              "studio.delete-body",
+                              "“{name}” will be removed from the Media Library for good. Any content still pointing at it will lose its image.",
+                              { name: entry.fileName },
+                            )}
+                          </Dialog.Body>
+                          <Dialog.Footer>
+                            <Dialog.Cancel>
+                              <Button variant="tertiary" fullWidth>
+                                {t("studio.cancel", "Cancel")}
+                              </Button>
+                            </Dialog.Cancel>
+                            <Dialog.Action>
+                              <Button
+                                variant="danger-light"
+                                fullWidth
+                                startIcon={<Trash />}
+                                onClick={() => void remove(entry)}
+                              >
+                                {t("studio.confirm-delete", "Delete")}
+                              </Button>
+                            </Dialog.Action>
+                          </Dialog.Footer>
+                        </Dialog.Content>
+                      </Dialog.Root>
                     </Flex>
                   </Box>
                 ))}

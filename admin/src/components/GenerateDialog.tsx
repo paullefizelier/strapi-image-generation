@@ -11,6 +11,7 @@ import {
   SingleSelect,
   SingleSelectOption,
   Textarea,
+  TextInput,
   Toggle,
   Typography,
 } from "@strapi/design-system";
@@ -63,6 +64,7 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props)
   const [aspectRatio, setAspectRatio] = React.useState("");
   const [references, setReferences] = React.useState<Asset[]>(initialReferences);
   const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [title, setTitle] = React.useState("");
   const [useStyle, setUseStyle] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
@@ -106,6 +108,7 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props)
         aspectRatio,
         referenceFileIds: references.map((r) => r.id),
         useStyle,
+        title: title.trim(),
       });
       setResult(asset);
     } catch (err) {
@@ -184,6 +187,22 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props)
                         "A logistics warehouse at golden hour, wide shot, warm light",
                       )}
                     />
+                  </Field.Root>
+
+                  <Field.Root
+                    name="title"
+                    hint={t(
+                      "dialog.asset-title-hint",
+                      "Left empty, a short neutral one is written for you. The file name ends up in the image's public URL, so the prompt is a poor name for it.",
+                    )}
+                  >
+                    <Field.Label>{t("dialog.asset-title", "Title (optional)")}</Field.Label>
+                    <TextInput
+                      value={title}
+                      placeholder={t("dialog.asset-title-placeholder", "Written automatically")}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
+                    />
+                    <Field.Hint />
                   </Field.Root>
 
                   {settings?.stylePrompt ? (

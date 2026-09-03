@@ -7,6 +7,37 @@ carry breaking changes.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-03
+
+### Added
+
+- **Generated images get a written title, not the prompt.** The file name lands
+  in the asset's public URL, so naming a file after the prompt publishes a
+  description of the people in it — an editor writing "une femme d'une
+  trentaine d'années, en gilet de sécurité" was shipping that phrase into the
+  URL. A short, neutral title is now written by a cheap text model instructed to
+  name the scene, the trade and the place, and never a person's age, gender,
+  body, ethnicity or clothing. The dialog takes a title of your own if you
+  prefer. The prompt is not lost: it stays in the journal, which is not public.
+
+  Naming can never cost an image: any failure — no key, a timeout, a refusal —
+  falls back to the trimmed prompt, because an awkward name is a smaller problem
+  than a generation the editor paid for and did not get.
+
+- **Delete a generated image from the studio.** With a confirmation, since the
+  asset goes for good and content still pointing at it loses its image. Deletion
+  goes through the upload service, so the provider copy and the responsive
+  formats go with the row rather than being orphaned in storage.
+
+  Only files this plugin recorded can be deleted here. Without that guard, the
+  route would be a general "delete any media" endpoint for anyone holding the
+  generate permission — which is not what that permission says.
+
+  The journal entry stays, flagged as deleted: the image is gone, but the money
+  was spent, and dropping the row would quietly lower the running total. The
+  studio hides those rows and still counts them.
+
+
 ## [0.2.4] — 2026-09-03
 
 ### Fixed

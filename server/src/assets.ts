@@ -108,3 +108,18 @@ export async function createAsset(
     await fse.remove(tmpDir).catch(() => undefined);
   }
 }
+
+/**
+ * Delete a generated asset from the Media Library.
+ *
+ * Goes through the upload service so the provider copy, the responsive formats
+ * and the row all go together — deleting the row alone would leave orphans in
+ * storage. Returns false when the file is already gone, which is not an error:
+ * the studio's job is to end up with it absent.
+ */
+export async function deleteAsset(strapi: Core.Strapi, fileId: number): Promise<boolean> {
+  const file = await strapi.db.query("plugin::upload.file").findOne({ where: { id: fileId } });
+  if (!file) return false;
+  await strapi.plugin("upload").service("upload").remove(file);
+  return true;
+}

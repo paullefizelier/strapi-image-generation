@@ -10,7 +10,7 @@ import type {
 
 /** Thin, typed wrappers over the plugin's admin API. */
 export function useImageGenApi() {
-  const { get, post, put } = useFetchClient();
+  const { get, post, put, del } = useFetchClient();
   const base = `/${PLUGIN_ID}`;
 
   return {
@@ -38,6 +38,10 @@ export function useImageGenApi() {
     },
     async getJournal(): Promise<{ entries: JournalEntry[]; totalCost: number }> {
       const { data } = await get<{ entries: JournalEntry[]; totalCost: number }>(`${base}/journal`);
+      return data;
+    },
+    async deleteGenerated(fileId: number): Promise<{ deleted: boolean }> {
+      const { data } = await del<{ deleted: boolean }>(`${base}/journal/${fileId}`);
       return data;
     },
   };

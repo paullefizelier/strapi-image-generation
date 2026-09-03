@@ -1,7 +1,13 @@
 import type { Core } from "@strapi/strapi";
-import { assetNameFor, createAsset, fileNameFor } from "./assets";
+import { assetNameFor, createAsset, deleteAsset, fileNameFor } from "./assets";
 import { ensureFolder } from "./folder";
-import { appendJournal, readJournal, totalCost, type JournalEntry } from "./journal";
+import {
+  appendJournal,
+  readJournal,
+  markDeletedInJournal,
+  totalCost,
+  type JournalEntry,
+} from "./journal";
 import {
   ASPECT_RATIOS,
   DEFAULT_ASPECT_RATIO,
@@ -15,6 +21,7 @@ import {
 import { DEFAULT_REQUEST_TIMEOUT_MS, generateImage } from "./nanobanana";
 import { loadReferences } from "./reference";
 import { publicSettings, resolveSettings, setSettings, type StoredSettings } from "./settings";
+import { DEFAULT_TITLE_MODEL, sanitizeTitle, suggestTitle } from "./title";
 
 /**
  * Host configuration (config/plugins.ts) — all optional:
@@ -28,6 +35,7 @@ import { publicSettings, resolveSettings, setSettings, type StoredSettings } fro
  *     aspectRatio: "16:9",
  *     folderName: "Generated images",
  *     stylePrompt: "Photographic, natural light, muted palette.",
+ *     titleModel: "gemini-2.0-flash",  // names the asset; never blocks an image
  *     maxPromptLength: 2000,
  *     requestTimeoutMs: 55000,   // fail before the host's proxy does
  *   },
@@ -52,6 +60,7 @@ const config = {
     aspectRatio: DEFAULT_ASPECT_RATIO,
     folderName: "Generated images",
     stylePrompt: "",
+    titleModel: DEFAULT_TITLE_MODEL,
     maxPromptLength: DEFAULT_MAX_PROMPT,
     requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
   },
@@ -79,10 +88,13 @@ interface GenerateBody {
   useStyle?: boolean;
   /** Defaults to the model's own format; the models disagree on what they take. */
   outputMimeType?: string;
+  /** Names the asset. Empty asks the model for a short neutral one. */
+  title?: string;
 }
 
 interface Ctx<B = unknown> {
   request: { body?: B };
+  params: Record<string, string>;
   query: Record<string, string | undefined>;
   state: { user?: { id: number | string } };
   body: unknown;
@@ -167,12 +179,28 @@ const controllers = {
       }
 
       const user = ctx.state.user;
+
+      /**
+       * The file name lands in the asset's PUBLIC url, so the prompt is a poor
+       * one: it describes people. A short neutral title is asked of a cheap
+       * text model, and any failure falls back to the prompt — an awkward name
+       * beats losing an image the editor already paid for. The prompt itself is
+       * never lost: it stays in the journal, which is not public.
+       */
+      const given = sanitizeTitle(String(body.title ?? ""));
+      const suggested = given
+        ? ""
+        : await suggestTitle(settings.apiKey, prompt, {
+            model: strapi.plugin("image-gen").config("titleModel", DEFAULT_TITLE_MODEL) as string,
+          });
+      const name = given || suggested || assetNameFor(prompt);
+
       const folderId = await ensureFolder(strapi, settings.folderName, user);
       const asset = await createAsset(strapi, {
         buffer: generated.buffer,
         mimeType: generated.mimeType,
-        name: assetNameFor(prompt),
-        fileName: fileNameFor(prompt, generated.mimeType),
+        name,
+        fileName: fileNameFor(name, generated.mimeType),
         folderId,
         user,
       });
@@ -240,6 +268,27 @@ const controllers = {
       const entries = await readJournal(strapi);
       ctx.body = { entries, totalCost: totalCost(entries) };
     },
+
+    /**
+     * Delete one generated image, asset and journal entry together.
+     *
+     * Only files THIS plugin recorded can be deleted here. Without that guard
+     * the route would be a general "delete any media" endpoint for anyone
+     * holding the generate permission — which is not what that permission says.
+     */
+    async remove(ctx: Ctx) {
+      const fileId = Number(ctx.params.fileId);
+      if (!Number.isInteger(fileId) || fileId <= 0) ctx.throw(400, "A file id is required");
+
+      const entries = await readJournal(strapi);
+      if (!entries.some((entry) => entry.fileId === fileId)) {
+        ctx.throw(404, "That image was not generated here, so it is not this plugin's to delete");
+      }
+
+      const deleted = await deleteAsset(strapi, fileId);
+      await markDeletedInJournal(strapi, fileId);
+      ctx.body = { deleted };
+    },
   }),
 };
 
@@ -262,6 +311,7 @@ const routes = {
       adminRoute("GET", "/catalogue", "catalogue.get", [ACTIONS.generate]),
       adminRoute("POST", "/generate", "generate.run", [ACTIONS.generate]),
       adminRoute("GET", "/journal", "journal.list", [ACTIONS.generate]),
+      adminRoute("DELETE", "/journal/:fileId", "journal.remove", [ACTIONS.generate]),
       adminRoute("GET", "/settings", "settings.get", [ACTIONS.generate]),
       adminRoute("PUT", "/settings", "settings.update", [ACTIONS.settings]),
       adminRoute("POST", "/settings/test", "settings.test", [ACTIONS.settings]),

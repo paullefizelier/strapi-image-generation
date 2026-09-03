@@ -56,6 +56,8 @@ export interface JournalEntry {
   referenceFileIds: number[];
   estimatedCost: number | null;
   userId?: number | string;
+  /** Set once the asset has been deleted from the studio. */
+  deletedAt?: string;
 }
 
 export interface GenerateInput {
@@ -66,6 +68,8 @@ export interface GenerateInput {
   referenceFileIds?: number[];
   previousInteractionId?: string;
   useStyle?: boolean;
+  /** Names the asset. Empty asks the model for a short neutral one. */
+  title?: string;
 }
 
 export interface GenerateResult {

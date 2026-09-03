@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { JOURNAL_LIMIT, totalCost, withEntry, type JournalEntry } from "../journal";
+import { JOURNAL_LIMIT, totalCost, withEntry, markDeleted, type JournalEntry } from "../journal";
 
 const entry = (n: number, cost: number | null = 0.134): JournalEntry => ({
   at: `2026-09-0${(n % 9) + 1}T00:00:00.000Z`,
@@ -45,5 +45,33 @@ describe("totalCost", () => {
 
   it("is zero for an empty journal", () => {
     expect(totalCost([])).toBe(0);
+  });
+});
+
+describe("markDeleted", () => {
+  it("flags the deleted image and leaves the others untouched", () => {
+    const result = markDeleted([entry(1), entry(2), entry(3)], 2, "2026-09-03T10:00:00.000Z");
+    expect(result.map((e) => e.deletedAt)).toEqual([
+      undefined,
+      "2026-09-03T10:00:00.000Z",
+      undefined,
+    ]);
+  });
+
+  it("keeps the entry, so the running total does not drop", () => {
+    // The image is gone; the money is not coming back.
+    const entries = [entry(1), entry(2)];
+    const before = totalCost(entries);
+    expect(totalCost(markDeleted(entries, 1))).toBe(before);
+  });
+
+  it("keeps the first deletion date when called twice", () => {
+    const once = markDeleted([entry(1)], 1, "2026-09-01T00:00:00.000Z");
+    const twice = markDeleted(once, 1, "2026-09-03T00:00:00.000Z");
+    expect(twice[0].deletedAt).toBe("2026-09-01T00:00:00.000Z");
+  });
+
+  it("is a no-op for an id that is not there", () => {
+    expect(markDeleted([entry(1)], 99)[0].deletedAt).toBeUndefined();
   });
 });

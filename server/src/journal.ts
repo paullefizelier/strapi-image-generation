@@ -35,6 +35,12 @@ export interface JournalEntry {
   /** USD, or null when the model/size pair carries no known price. */
   estimatedCost: number | null;
   userId?: number | string;
+  /**
+   * When the asset was deleted from the studio. The entry STAYS: the image is
+   * gone but the money was spent, and dropping the row would quietly lower the
+   * running total. The studio hides these from the list and still counts them.
+   */
+  deletedAt?: string;
 }
 
 const store = (strapi: Core.Strapi) => strapi.store({ type: "plugin", name: "image-gen" });
@@ -59,7 +65,30 @@ export async function appendJournal(strapi: Core.Strapi, entry: JournalEntry): P
   await store(strapi).set({ key: "journal", value: withEntry(entries, entry) });
 }
 
-/** Total spent across the retained window — what the studio shows as a running cost. */
+/**
+ * Flag one entry as deleted, rather than removing it. Pure, so the rule is
+ * testable without a store. Unknown ids are left alone: the caller has already
+ * decided whether "not there" is an error.
+ */
+export function markDeleted(
+  entries: JournalEntry[],
+  fileId: number,
+  at = new Date().toISOString(),
+): JournalEntry[] {
+  return entries.map((entry) =>
+    entry.fileId === fileId && !entry.deletedAt ? { ...entry, deletedAt: at } : entry,
+  );
+}
+
+export async function markDeletedInJournal(strapi: Core.Strapi, fileId: number): Promise<void> {
+  const entries = await readJournal(strapi);
+  await store(strapi).set({ key: "journal", value: markDeleted(entries, fileId) });
+}
+
+/**
+ * Total spent across the retained window — what the studio shows as a running
+ * cost. Deleted images are included: deleting one is not a refund.
+ */
 export function totalCost(entries: JournalEntry[]): number {
   return entries.reduce((sum, entry) => sum + (entry.estimatedCost ?? 0), 0);
 }

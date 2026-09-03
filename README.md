@@ -23,6 +23,11 @@ plain ground for a card.
 **Settings → Image studio** — the full screen: generate, retouch, and the
 history of everything generated so far.
 
+Generated images can also be **deleted from the studio**, with a confirmation:
+the asset goes for good, and content still pointing at it loses its image. The
+journal entry stays, flagged as deleted — the image is gone, but the money was
+spent, and dropping the row would quietly lower the running total.
+
 **Inside a content entry** — every media field gains a *Generate an image*
 button (or *Retouch with AI*, when the field already holds one). It fills the
 field directly, which is fewer steps than the picker beside it: no generate,
@@ -36,6 +41,17 @@ close, reopen, hunt for the file.
 > Strapi's own media field and renders it inside its own wrapper. If Strapi's
 > internals ever move, the wrapper is not registered at all: a media field that
 > lost its picker would be far worse than a missing button.
+
+### Titles that are safe to publish
+
+The file name ends up in the asset's **public URL**, so naming a generated file
+after its prompt publishes a description of the people in it. Each image gets a
+short title written instead — the scene, the trade, the place, never someone's
+age, gender, body, ethnicity or clothing. Write your own in the dialog if you
+prefer. The prompt is kept in the journal, which is not public.
+
+Naming never costs you an image: if the title call fails for any reason, the
+image still ships under a trimmed prompt.
 
 ### The cost is on screen, before the call
 
@@ -85,6 +101,7 @@ export default ({ env }) => ({
       imageSize: "2K",               // 512px | 1K | 2K | 4K, per model
       aspectRatio: "16:9",
       folderName: "Generated images",
+      titleModel: "gemini-2.0-flash",   // writes the asset title
       maxPromptLength: 2000,
     },
   },
@@ -136,8 +153,9 @@ permission.
 | Route | Permission | |
 |---|---|---|
 | `GET /image-gen/catalogue` | `generate` | Models, sizes, prices, ratios |
-| `POST /image-gen/generate` | `generate` | `{ prompt, model?, imageSize?, aspectRatio?, referenceFileIds?, previousInteractionId? }` |
+| `POST /image-gen/generate` | `generate` | `{ prompt, title?, model?, imageSize?, aspectRatio?, referenceFileIds?, previousInteractionId? }` |
 | `GET /image-gen/journal` | `generate` | The provenance log and the running total |
+| `DELETE /image-gen/journal/:fileId` | `generate` | Deletes the asset. 404 for a file this plugin did not generate |
 | `GET /image-gen/settings` | `generate` | Redacted — never returns the key |
 | `PUT /image-gen/settings` | `settings` | An absent `apiKey` keeps the stored one; `""` clears it |
 | `POST /image-gen/settings/test` | `settings` | One 1K Lite render, ~$0.034, to prove the credentials |
