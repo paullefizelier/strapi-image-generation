@@ -21,6 +21,8 @@ export interface PublicSettings {
   imageSize: string;
   aspectRatio: string;
   folderName: string;
+  /** House style folded into every prompt. Empty = none. */
+  stylePrompt: string;
 }
 
 /** A Media Library file, as the upload service returns it after creation. */
@@ -47,6 +49,8 @@ export interface JournalEntry {
   imageSize: string;
   aspectRatio: string;
   prompt: string;
+  /** The style in force when this image was made — not the current setting. */
+  style?: string;
   referenceFileIds: number[];
   estimatedCost: number | null;
   userId?: number | string;
@@ -59,6 +63,7 @@ export interface GenerateInput {
   aspectRatio?: string;
   referenceFileIds?: number[];
   previousInteractionId?: string;
+  useStyle?: boolean;
 }
 
 export interface GenerateResult {

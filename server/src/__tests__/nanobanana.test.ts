@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildRequest, generateImage, parseResponse } from "../nanobanana";
+import { buildRequest, composePrompt, DEFAULT_REQUEST_TIMEOUT_MS, generateImage, parseResponse } from "../nanobanana";
 
 /**
  * These tests pin the wire contract of the Interactions API. It is deliberately
@@ -53,6 +53,53 @@ describe("buildRequest", () => {
     expect(buildRequest({ ...base, previousInteractionId: "int_1" }).previous_interaction_id).toBe(
       "int_1",
     );
+  });
+});
+
+describe("composePrompt", () => {
+  it("puts the house style first and the subject on its own line", () => {
+    // The Interactions API has no system field, so the style has to ride inside
+    // the prompt. Separate lines stop a style sentence running into the subject.
+    expect(composePrompt("A warehouse", "Photographic, muted palette.")).toBe(
+      "Photographic, muted palette.\n\nA warehouse",
+    );
+  });
+
+  it("leaves the prompt untouched when no style is set", () => {
+    expect(composePrompt("A warehouse")).toBe("A warehouse");
+    expect(composePrompt("A warehouse", "   ")).toBe("A warehouse");
+  });
+
+  it("trims both sides so a stray newline in the setting does not shift the prompt", () => {
+    expect(composePrompt("  A warehouse \n", "  Muted palette.  ")).toBe(
+      "Muted palette.\n\nA warehouse",
+    );
+  });
+
+  it("survives an empty prompt without emitting a dangling separator", () => {
+    expect(composePrompt("", "Muted palette.")).toBe("Muted palette.");
+  });
+});
+
+describe("the style inside a request", () => {
+  it("reaches the API in the single text block", () => {
+    const request = buildRequest({ ...base, style: "Muted palette." });
+    expect(request.input).toEqual([
+      { type: "text", text: "Muted palette.\n\nA warehouse at golden hour" },
+    ]);
+  });
+
+  it("still leads the reference images on a retouch", () => {
+    const request = buildRequest({
+      ...base,
+      style: "Muted palette.",
+      references: [{ mimeType: "image/png", data: "AAA" }],
+    });
+    expect(request.input[0]).toEqual({
+      type: "text",
+      text: "Muted palette.\n\nA warehouse at golden hour",
+    });
+    expect(request.input[1]).toEqual({ type: "image", mime_type: "image/png", data: "AAA" });
   });
 });
 
@@ -116,6 +163,27 @@ describe("generateImage", () => {
       json: async () => ({ error: { message: "Quota exceeded" } }),
     });
     await expect(generateImage("k", base, fetchMock as never)).rejects.toThrow("Quota exceeded");
+  });
+
+  it("fails on its own clock rather than hanging until a proxy gives up", async () => {
+    // A request that never returns keeps the HTTP connection open until the
+    // host's proxy kills it, and the caller then sees a bare gateway 502.
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(
+      (_url: string, init: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          init.signal.addEventListener("abort", () => reject(new Error("aborted")));
+        }),
+    );
+    const promise = generateImage("k", base, fetchMock as never, 1_000);
+    const assertion = expect(promise).rejects.toThrow(/did not answer within 1s/);
+    await vi.advanceTimersByTimeAsync(1_100);
+    await assertion;
+    vi.useRealTimers();
+  });
+
+  it("defaults to a timeout below the usual 60s proxy limit", () => {
+    expect(DEFAULT_REQUEST_TIMEOUT_MS).toBeLessThan(60_000);
   });
 
   it("still reports the status when the error body is unreadable", async () => {

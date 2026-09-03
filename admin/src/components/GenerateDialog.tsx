@@ -11,6 +11,7 @@ import {
   SingleSelect,
   SingleSelectOption,
   Textarea,
+  Toggle,
   Typography,
 } from "@strapi/design-system";
 import { useStrapiApp } from "@strapi/strapi/admin";
@@ -62,6 +63,7 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props)
   const [aspectRatio, setAspectRatio] = React.useState("");
   const [references, setReferences] = React.useState<Asset[]>(initialReferences);
   const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [useStyle, setUseStyle] = React.useState(true);
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
   const [result, setResult] = React.useState<Asset | null>(null);
@@ -103,6 +105,7 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props)
         imageSize,
         aspectRatio,
         referenceFileIds: references.map((r) => r.id),
+        useStyle,
       });
       setResult(asset);
     } catch (err) {
@@ -182,6 +185,40 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props)
                       )}
                     />
                   </Field.Root>
+
+                  {settings?.stylePrompt ? (
+                    <Box padding={3} background="neutral100" hasRadius>
+                      <Flex direction="column" alignItems="stretch" gap={2}>
+                        <Flex justifyContent="space-between" alignItems="center" gap={3}>
+                          <Typography variant="sigma" textColor="neutral600">
+                            {t("dialog.style", "House style")}
+                          </Typography>
+                          <Toggle
+                            checked={useStyle}
+                            onLabel={t("dialog.style-on", "On")}
+                            offLabel={t("dialog.style-off", "Off")}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                              setUseStyle(e.target.checked)
+                            }
+                          />
+                        </Flex>
+                        {/* Shown, not hidden: an invisible prompt modifier is the
+                            surest way to make a result inexplicable. */}
+                        <Typography
+                          variant="pi"
+                          textColor={useStyle ? "neutral700" : "neutral500"}
+                          style={{ whiteSpace: "pre-wrap" }}
+                        >
+                          {settings.stylePrompt}
+                        </Typography>
+                        {useStyle ? (
+                          <Typography variant="pi" textColor="neutral500">
+                            {t("dialog.style-hint", "Added before your description.")}
+                          </Typography>
+                        ) : null}
+                      </Flex>
+                    </Box>
+                  ) : null}
 
                   <Flex gap={3} wrap="wrap" alignItems="end">
                     <Field.Root name="model" style={{ minWidth: 220 }}>

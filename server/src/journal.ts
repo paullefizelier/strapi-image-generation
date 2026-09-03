@@ -24,6 +24,12 @@ export interface JournalEntry {
   imageSize: string;
   aspectRatio: string;
   prompt: string;
+  /**
+   * The house style in force at the time. Stored per entry, not looked up:
+   * the setting changes, and provenance must say what actually produced THIS
+   * image, not what the style happens to be today.
+   */
+  style?: string;
   /** Upload ids the retouch worked from; empty for a text-to-image. */
   referenceFileIds: number[];
   /** USD, or null when the model/size pair carries no known price. */

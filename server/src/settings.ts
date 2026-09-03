@@ -27,6 +27,8 @@ export interface StoredSettings {
   imageSize?: ImageSize;
   aspectRatio?: AspectRatio;
   folderName?: string;
+  /** House style folded into every prompt. Empty = none. */
+  stylePrompt?: string;
 }
 
 export type KeySource = "settings" | "config" | "env" | null;
@@ -40,6 +42,7 @@ export interface PublicSettings {
   imageSize: ImageSize;
   aspectRatio: AspectRatio;
   folderName: string;
+  stylePrompt: string;
 }
 
 const store = (strapi: Core.Strapi) => strapi.store({ type: "plugin", name: "image-gen" });
@@ -66,6 +69,7 @@ export async function setSettings(
   if (input.model) next.model = input.model;
   if (input.imageSize) next.imageSize = input.imageSize;
   if (input.aspectRatio) next.aspectRatio = input.aspectRatio;
+  if (input.stylePrompt !== undefined) next.stylePrompt = String(input.stylePrompt).trim();
   if (input.folderName !== undefined) {
     const name = String(input.folderName).trim();
     next.folderName = name || DEFAULT_FOLDER_NAME;
@@ -81,6 +85,7 @@ export interface ResolvedSettings {
   imageSize: ImageSize;
   aspectRatio: AspectRatio;
   folderName: string;
+  stylePrompt: string;
 }
 
 /** Admin-saved value first, then the host's config file, then the environment. */
@@ -117,11 +122,12 @@ export async function resolveSettings(strapi: Core.Strapi): Promise<ResolvedSett
     imageSize: stored.imageSize ?? (config("imageSize", DEFAULT_SIZE) as ImageSize),
     aspectRatio: stored.aspectRatio ?? (config("aspectRatio", DEFAULT_ASPECT_RATIO) as AspectRatio),
     folderName: stored.folderName ?? (config("folderName", DEFAULT_FOLDER_NAME) as string),
+    stylePrompt: stored.stylePrompt ?? (config("stylePrompt", "") as string),
   };
 }
 
 export async function publicSettings(strapi: Core.Strapi): Promise<PublicSettings> {
-  const { apiKey, keySource, model, imageSize, aspectRatio, folderName } =
+  const { apiKey, keySource, model, imageSize, aspectRatio, folderName, stylePrompt } =
     await resolveSettings(strapi);
   return {
     configured: Boolean(apiKey),
@@ -131,5 +137,6 @@ export async function publicSettings(strapi: Core.Strapi): Promise<PublicSetting
     imageSize,
     aspectRatio,
     folderName,
+    stylePrompt,
   };
 }

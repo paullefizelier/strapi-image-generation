@@ -7,6 +7,28 @@ carry breaking changes.
 
 ## [Unreleased]
 
+### Added
+
+- **A house style.** A prompt fragment set in the settings and folded into every
+  generation, so a whole library shares one look. The Interactions API has no
+  system-instruction field, so it travels inside the prompt itself — which is
+  why it is SHOWN in the dialog with a per-image toggle rather than applied
+  invisibly: an unseen prompt modifier is the surest way to make a result
+  inexplicable. The style in force is recorded per journal entry, not looked up,
+  so provenance says what actually produced that image.
+
+### Fixed
+
+- **Provider failures no longer answer 502.** A 502 from the plugin is
+  indistinguishable from the hosting proxy's own 502, which turned "the model
+  refused this prompt" into an unreadable gateway error page. They now answer
+  **424**.
+- **The provider call has a timeout** (`requestTimeoutMs`, default 55s — under
+  the ~60s proxy limit of common hosts). Without it a hung call held the request
+  open until the platform killed it, and the caller saw a bare gateway error
+  instead of an explanation.
+
+
 ## [0.1.0] — 2026-09-03
 
 First release.

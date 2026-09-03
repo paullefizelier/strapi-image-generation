@@ -11,7 +11,7 @@ import {
   MODELS,
   validateRequest,
 } from "./models";
-import { generateImage } from "./nanobanana";
+import { DEFAULT_REQUEST_TIMEOUT_MS, generateImage } from "./nanobanana";
 import { loadReferences } from "./reference";
 import { publicSettings, resolveSettings, setSettings, type StoredSettings } from "./settings";
 
@@ -26,7 +26,9 @@ import { publicSettings, resolveSettings, setSettings, type StoredSettings } fro
  *     imageSize: "2K",
  *     aspectRatio: "16:9",
  *     folderName: "Generated images",
+ *     stylePrompt: "Photographic, natural light, muted palette.",
  *     maxPromptLength: 2000,
+ *     requestTimeoutMs: 55000,   // fail before the host's proxy does
  *   },
  * }
  *
@@ -48,7 +50,9 @@ const config = {
     imageSize: DEFAULT_SIZE,
     aspectRatio: DEFAULT_ASPECT_RATIO,
     folderName: "Generated images",
+    stylePrompt: "",
     maxPromptLength: DEFAULT_MAX_PROMPT,
+    requestTimeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
   },
   validator(cfg: { maxPromptLength?: unknown; folderName?: unknown }) {
     if (
@@ -70,6 +74,8 @@ interface GenerateBody {
   aspectRatio?: string;
   referenceFileIds?: number[];
   previousInteractionId?: string;
+  /** Defaults to true — the house style applies unless explicitly waived. */
+  useStyle?: boolean;
 }
 
 interface Ctx<B = unknown> {
@@ -99,6 +105,7 @@ const controllers = {
 
       const prompt = String(body.prompt ?? "").trim();
       if (!prompt) ctx.throw(400, "A prompt is required");
+      // Measures what the editor typed: the house style is not their budget.
       if (prompt.length > maxPrompt) {
         ctx.throw(400, `The prompt is longer than the ${maxPrompt}-character limit`);
       }
@@ -107,6 +114,7 @@ const controllers = {
       const imageSize = body.imageSize ?? settings.imageSize;
       const aspectRatio = body.aspectRatio ?? settings.aspectRatio;
       const referenceFileIds = Array.isArray(body.referenceFileIds) ? body.referenceFileIds : [];
+      const style = body.useStyle === false ? "" : settings.stylePrompt;
 
       // The client is not an authority: a hand-rolled request must not be able
       // to bill a 4K Pro render through a form that offered Lite.
@@ -127,18 +135,28 @@ const controllers = {
 
       let generated;
       try {
-        generated = await generateImage(settings.apiKey, {
-          model,
-          prompt,
-          aspectRatio,
-          imageSize,
-          references,
-          previousInteractionId: body.previousInteractionId,
-        });
+        generated = await generateImage(
+          settings.apiKey,
+          {
+            model,
+            prompt,
+            style,
+            aspectRatio,
+            imageSize,
+            references,
+            previousInteractionId: body.previousInteractionId,
+          },
+          undefined,
+          strapi.plugin("image-gen").config("requestTimeoutMs", DEFAULT_REQUEST_TIMEOUT_MS) as number,
+        );
       } catch (err) {
         // The provider's own message is the useful one — a wrong key, a refused
         // subject and a rate limit are different problems.
-        ctx.throw(502, (err as Error).message);
+        //
+        // 424 rather than 502 ON PURPOSE: a 502 from here is indistinguishable
+        // from the platform proxy's own 502, which turns "the model refused the
+        // prompt" into an unreadable gateway error page.
+        ctx.throw(424, (err as Error).message);
       }
 
       const user = ctx.state.user;
@@ -162,6 +180,7 @@ const controllers = {
         imageSize,
         aspectRatio,
         prompt,
+        ...(style ? { style } : {}),
         referenceFileIds: references.map((r) => r.fileId),
         estimatedCost: estimateCost(model, imageSize),
         userId: user?.id,

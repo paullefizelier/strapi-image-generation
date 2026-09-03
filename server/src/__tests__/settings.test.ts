@@ -109,6 +109,15 @@ describe("write semantics", () => {
     expect((strapi as never as { _state: Record<string, { apiKey?: string }> })._state.settings.apiKey).toBe("spaced-key");
   });
 
+  it("stores the house style, and lets it be cleared", async () => {
+    const strapi = makeStrapi();
+    await setSettings(strapi, { stylePrompt: "  Photographic, muted palette.  " });
+    expect((await publicSettings(strapi)).stylePrompt).toBe("Photographic, muted palette.");
+    // Unlike the folder name, an empty style is a legitimate choice: no style.
+    await setSettings(strapi, { stylePrompt: "" });
+    expect((await publicSettings(strapi)).stylePrompt).toBe("");
+  });
+
   it("falls back to the default folder name when blanked", async () => {
     const strapi = makeStrapi();
     await setSettings(strapi, { folderName: "   " });

@@ -8,6 +8,7 @@ import {
   Flex,
   Loader,
   Main,
+  Textarea,
   SingleSelect,
   SingleSelectOption,
   TextInput,
@@ -213,6 +214,30 @@ const SettingsPage = () => {
                   })}
                 </Typography>
               ) : null}
+
+              <Field.Root
+                name="stylePrompt"
+                hint={t(
+                  "settings.style-hint",
+                  "Prepended to every prompt, so generated images share a look. The Interactions API has no system field, so it travels inside the prompt itself — editors see it and can switch it off per image.",
+                )}
+              >
+                <Field.Label>{t("settings.style", "House style")}</Field.Label>
+                <Textarea
+                  rows={3}
+                  defaultValue={settings.stylePrompt}
+                  placeholder={t(
+                    "settings.style-placeholder",
+                    "Photographic, natural light, muted palette, no text.",
+                  )}
+                  onBlur={(e: React.FocusEvent<HTMLTextAreaElement>) => {
+                    if (e.target.value !== settings.stylePrompt) {
+                      void save({ stylePrompt: e.target.value });
+                    }
+                  }}
+                />
+                <Field.Hint />
+              </Field.Root>
 
               <Field.Root
                 name="folderName"

@@ -23,6 +23,8 @@ export interface ReferenceImage {
 export interface GenerateOptions {
   model: ModelId | string;
   prompt: string;
+  /** House style, prepended to the prompt. See `composePrompt`. */
+  style?: string;
   aspectRatio: AspectRatio | string;
   imageSize: ImageSize | string;
   /** Present for a retouch: the images the model works from. */
@@ -49,10 +51,29 @@ export interface InteractionRequest {
   previous_interaction_id?: string;
 }
 
+/**
+ * Fold the house style into the prompt.
+ *
+ * The Interactions API has NO system-instruction field — unlike
+ * `:generateContent`, an input block carries no role. Style guidance therefore
+ * has to travel inside the prompt itself. It leads, and the editor's own words
+ * follow on their own line: a model reads the opening as the frame and the rest
+ * as the subject, and keeping them on separate lines stops a style sentence
+ * from running into the subject and changing its meaning.
+ */
+export function composePrompt(prompt: string, style?: string): string {
+  const trimmedStyle = (style ?? "").trim();
+  const trimmedPrompt = prompt.trim();
+  if (!trimmedStyle) return trimmedPrompt;
+  if (!trimmedPrompt) return trimmedStyle;
+  return `${trimmedStyle}\n\n${trimmedPrompt}`;
+}
+
 export function buildRequest(options: GenerateOptions): InteractionRequest {
   const {
     model,
     prompt,
+    style,
     aspectRatio,
     imageSize,
     references = [],
@@ -62,7 +83,7 @@ export function buildRequest(options: GenerateOptions): InteractionRequest {
 
   // The text block leads: the reference images are what the instruction acts
   // upon, and the API reads the prompt as the instruction for the whole input.
-  const input: InputBlock[] = [{ type: "text", text: prompt }];
+  const input: InputBlock[] = [{ type: "text", text: composePrompt(prompt, style) }];
   for (const reference of references) {
     input.push({ type: "image", mime_type: reference.mimeType, data: reference.data });
   }
@@ -121,10 +142,22 @@ export function parseResponse(body: unknown, status?: number): GeneratedImage {
   };
 }
 
+/**
+ * Fail before the gateway does.
+ *
+ * A hung provider call keeps the HTTP request open until the platform's proxy
+ * gives up, and the caller then sees a generic 502 from the edge rather than
+ * anything explaining itself. Timing out on our side turns that into a real
+ * message. Default is deliberately under the ~60s proxy timeouts of common
+ * hosts (Strapi Cloud/Koyeb, Heroku, Fly).
+ */
+export const DEFAULT_REQUEST_TIMEOUT_MS = 55_000;
+
 export async function generateImage(
   apiKey: string,
   options: GenerateOptions,
   fetchImpl: typeof fetch = fetch,
+  timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
 ): Promise<GeneratedImage> {
   if (!apiKey) {
     throw new Error(
@@ -132,16 +165,32 @@ export async function generateImage(
     );
   }
 
-  const response = await fetchImpl(ENDPOINT, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      // The Interactions API authenticates by header. A key in the query string
-      // is the older generateContent style and is rejected here.
-      "x-goog-api-key": apiKey,
-    },
-    body: JSON.stringify(buildRequest(options)),
-  });
+  const controller = new AbortController();
+  const abort = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
+
+  let response: Response;
+  try {
+    response = await fetchImpl(ENDPOINT, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        // The Interactions API authenticates by header. A key in the query string
+        // is the older generateContent style and is rejected here.
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify(buildRequest(options)),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new Error(
+        `The image API did not answer within ${Math.round(timeoutMs / 1000)}s. A large size on the Pro model is slow — try a smaller size, or raise \`requestTimeoutMs\` if your host allows longer requests.`,
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(abort);
+  }
 
   // Read the body whatever the status: the useful message lives in it.
   const body: unknown = await response.json().catch(() => ({}));
