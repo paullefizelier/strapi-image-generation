@@ -5,6 +5,8 @@ export interface ModelSpec {
   sizes: string[];
   price: Record<string, number>;
   maxReferences: number;
+  /** Formats this model can emit, first one the default. */
+  outputMimeTypes: string[];
   note: string;
 }
 

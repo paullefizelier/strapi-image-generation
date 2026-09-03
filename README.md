@@ -97,6 +97,13 @@ live under **Settings → Roles**: `Generate and retouch images` and
 
 ## Things worth knowing
 
+**Output format is the model's, not yours.** The models disagree on what they
+can emit and Google publishes no matrix: `gemini-3-pro-image` answers
+*"The value 'image/png' is not supported"* and takes **JPEG only**, so images
+from it have **no transparency** — for a cut-out subject on a clear background,
+use Nano Banana 2, which accepts PNG. The plugin sends each model the format it
+declares and rejects a mismatch before spending anything.
+
 **Every image carries a SynthID watermark.** It is invisible, it identifies the
 image as AI-generated, and Google provides no way to disable it. The dialog says
 so, because an editor publishing a client-facing visual should know.

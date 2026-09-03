@@ -31,7 +31,10 @@ export interface GenerateOptions {
   references?: ReferenceImage[];
   /** Continues a previous edit chain. */
   previousInteractionId?: string;
-  /** Output format. PNG keeps text crisp, which is what Pro is chosen for. */
+  /**
+   * Output format. NOT optional in practice: the models disagree on what they
+   * accept, so the caller passes the one its model declares (see models.ts).
+   */
   outputMimeType?: "image/png" | "image/jpeg";
 }
 
@@ -78,7 +81,7 @@ export function buildRequest(options: GenerateOptions): InteractionRequest {
     imageSize,
     references = [],
     previousInteractionId,
-    outputMimeType = "image/png",
+    outputMimeType = "image/jpeg",
   } = options;
 
   // The text block leads: the reference images are what the instruction acts

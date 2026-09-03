@@ -38,6 +38,9 @@ export const ASPECT_RATIOS: AspectRatio[] = [
   "21:9",
 ];
 
+/** Output formats. The first is the default for that model. */
+export type OutputMimeType = "image/jpeg" | "image/png";
+
 export interface ModelSpec {
   id: ModelId;
   label: string;
@@ -47,6 +50,16 @@ export interface ModelSpec {
   price: Partial<Record<ImageSize, number>>;
   /** How many reference images the model accepts for a retouch. */
   maxReferences: number;
+  /**
+   * Output formats this model accepts, first one the default.
+   *
+   * The documentation shows both jpeg and png examples but publishes no
+   * per-model matrix, so this list is what each model is KNOWN to accept:
+   * gemini-3-pro-image answers "The value 'image/png' is not supported for
+   * 'response_format.mime_type'. Supported values: 'image/jpeg'." Anything not
+   * proven stays off the list rather than being assumed.
+   */
+  outputMimeTypes: OutputMimeType[];
   note: string;
 }
 
@@ -59,7 +72,8 @@ export const MODELS: ModelSpec[] = [
     // Pro counts references as up to 10 objects plus 4 characters; 14 is the
     // ceiling either way, and the API is the real authority.
     maxReferences: 14,
-    note: "Best text rendering inside the image.",
+    outputMimeTypes: ["image/jpeg"],
+    note: "Best text rendering inside the image. JPEG only, so no transparency.",
   },
   {
     id: "gemini-3.1-flash-image",
@@ -67,7 +81,8 @@ export const MODELS: ModelSpec[] = [
     sizes: ["512px", "1K", "2K", "4K"],
     price: { "512px": 0.045, "1K": 0.067, "2K": 0.101, "4K": 0.151 },
     maxReferences: 14,
-    note: "Fast, cheaper, up to 14 reference images.",
+    outputMimeTypes: ["image/jpeg", "image/png"],
+    note: "Fast, cheaper, up to 14 reference images. PNG available.",
   },
   {
     id: "gemini-3.1-flash-lite-image",
@@ -75,6 +90,7 @@ export const MODELS: ModelSpec[] = [
     sizes: ["1K"],
     price: { "1K": 0.0336 },
     maxReferences: 14,
+    outputMimeTypes: ["image/jpeg"],
     note: "Cheapest. 1K only.",
   },
 ];
@@ -95,11 +111,16 @@ export function estimateCost(model: string, size: string): number | null {
   return spec.price[size as ImageSize] ?? null;
 }
 
+/** The model's default output format, or null when the model is unknown. */
+export const defaultMimeFor = (model: string): OutputMimeType | null =>
+  modelById(model)?.outputMimeTypes[0] ?? null;
+
 export interface RequestShape {
   model: string;
   imageSize: string;
   aspectRatio: string;
   referenceCount: number;
+  outputMimeType?: string;
 }
 
 /**
@@ -112,6 +133,7 @@ export function validateRequest({
   imageSize,
   aspectRatio,
   referenceCount,
+  outputMimeType,
 }: RequestShape): string[] {
   const errors: string[] = [];
   const spec = modelById(model);
@@ -127,6 +149,11 @@ export function validateRequest({
   }
   if (referenceCount > spec.maxReferences) {
     errors.push(`${spec.label} accepts at most ${spec.maxReferences} reference images (got ${referenceCount})`);
+  }
+  if (outputMimeType && !spec.outputMimeTypes.includes(outputMimeType as OutputMimeType)) {
+    errors.push(
+      `${spec.label} does not output "${outputMimeType}" (${spec.outputMimeTypes.join(", ")})`,
+    );
   }
   return errors;
 }

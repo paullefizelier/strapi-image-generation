@@ -7,6 +7,19 @@ carry breaking changes.
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-09-03
+
+### Fixed
+
+- **The output format is now the model's own.** Every generation asked for PNG,
+  which `gemini-3-pro-image` — the default model — rejects outright: *"The value
+  'image/png' is not supported for 'response_format.mime_type'. Supported
+  values: 'image/jpeg'."* The format now lives in the model catalogue beside the
+  sizes and prices, is validated server-side, and the catalogue records only
+  what each model is KNOWN to accept rather than what the docs imply. Note that
+  JPEG has no transparency: for a cut-out subject, Nano Banana 2 takes PNG.
+
+
 ## [0.2.0] — 2026-09-03
 
 ### Added
@@ -65,6 +78,7 @@ First release.
 - Strapi's Media Library page and asset picker cannot be extended — see the
   README for why, and what is done instead.
 
-[Unreleased]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/paullefizelier/strapi-plugin-image-gen/releases/tag/v0.1.0

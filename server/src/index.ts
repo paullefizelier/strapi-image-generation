@@ -7,6 +7,7 @@ import {
   DEFAULT_ASPECT_RATIO,
   DEFAULT_MODEL,
   DEFAULT_SIZE,
+  defaultMimeFor,
   estimateCost,
   MODELS,
   validateRequest,
@@ -76,6 +77,8 @@ interface GenerateBody {
   previousInteractionId?: string;
   /** Defaults to true — the house style applies unless explicitly waived. */
   useStyle?: boolean;
+  /** Defaults to the model's own format; the models disagree on what they take. */
+  outputMimeType?: string;
 }
 
 interface Ctx<B = unknown> {
@@ -115,6 +118,8 @@ const controllers = {
       const aspectRatio = body.aspectRatio ?? settings.aspectRatio;
       const referenceFileIds = Array.isArray(body.referenceFileIds) ? body.referenceFileIds : [];
       const style = body.useStyle === false ? "" : settings.stylePrompt;
+      // Each model declares what it can emit — Pro rejects PNG outright.
+      const outputMimeType = body.outputMimeType ?? defaultMimeFor(model) ?? "image/jpeg";
 
       // The client is not an authority: a hand-rolled request must not be able
       // to bill a 4K Pro render through a form that offered Lite.
@@ -123,6 +128,7 @@ const controllers = {
         imageSize,
         aspectRatio,
         referenceCount: referenceFileIds.length,
+        outputMimeType,
       });
       if (errors.length) ctx.throw(400, errors.join("; "));
 
@@ -145,6 +151,7 @@ const controllers = {
             imageSize,
             references,
             previousInteractionId: body.previousInteractionId,
+            outputMimeType: outputMimeType as "image/png" | "image/jpeg",
           },
           undefined,
           strapi.plugin("image-gen").config("requestTimeoutMs", DEFAULT_REQUEST_TIMEOUT_MS) as number,
@@ -219,6 +226,7 @@ const controllers = {
           prompt: "A plain solid light grey square. No text.",
           aspectRatio: "1:1",
           imageSize: "1K",
+          outputMimeType: defaultMimeFor("gemini-3.1-flash-lite-image") ?? "image/jpeg",
         });
         ctx.body = { ok: true, bytes: generated.buffer.length, costedAbout: 0.0336 };
       } catch (err) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateCost, MODELS, modelById, validateRequest } from "../models";
+import { defaultMimeFor, estimateCost, MODELS, modelById, validateRequest } from "../models";
 
 describe("the catalogue", () => {
   it("prices every size each model declares — a gap would show as free", () => {
@@ -25,6 +25,48 @@ describe("the catalogue", () => {
 
   it("does not offer the deprecated 2.5 model", () => {
     expect(modelById("gemini-2.5-flash-image")).toBeUndefined();
+  });
+});
+
+describe("output formats", () => {
+  it("every model declares at least one format it can emit", () => {
+    for (const model of MODELS) {
+      expect(model.outputMimeTypes.length, model.id).toBeGreaterThan(0);
+    }
+  });
+
+  it("Pro is JPEG only — the API rejects PNG on it outright", () => {
+    // "The value 'image/png' is not supported for 'response_format.mime_type'.
+    //  Supported values: 'image/jpeg'." — straight from the API.
+    expect(modelById("gemini-3-pro-image")!.outputMimeTypes).toEqual(["image/jpeg"]);
+    expect(defaultMimeFor("gemini-3-pro-image")).toBe("image/jpeg");
+  });
+
+  it("falls back to nothing for an unknown model rather than guessing", () => {
+    expect(defaultMimeFor("gemini-9-imaginary")).toBeNull();
+  });
+
+  it("rejects a format the model cannot emit", () => {
+    const errors = validateRequest({
+      model: "gemini-3-pro-image",
+      imageSize: "2K",
+      aspectRatio: "16:9",
+      referenceCount: 0,
+      outputMimeType: "image/png",
+    });
+    expect(errors[0]).toMatch(/does not output "image\/png"/);
+  });
+
+  it("accepts PNG on the model that documents it", () => {
+    expect(
+      validateRequest({
+        model: "gemini-3.1-flash-image",
+        imageSize: "1K",
+        aspectRatio: "1:1",
+        referenceCount: 0,
+        outputMimeType: "image/png",
+      }),
+    ).toEqual([]);
   });
 });
 
