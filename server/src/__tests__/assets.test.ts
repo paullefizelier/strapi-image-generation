@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { assetNameFor, fileNameFor } from "../assets";
-import { pickVariantUrl, MAX_REFERENCE_BYTES } from "../reference";
+import { loadReferences, pickVariantUrl, MAX_REFERENCE_BYTES, REFERENCE_FIELDS } from "../reference";
 
 describe("fileNameFor", () => {
   const at = new Date("2026-09-03T10:00:00.000Z");
@@ -55,15 +55,16 @@ describe("pickVariantUrl", () => {
   };
 
   it("uses the original when it fits the budget", () => {
-    expect(pickVariantUrl({ ...file, sizeInBytes: 1000 })).toBe("/uploads/hero.png");
+    // `size` is in KILOBYTES: the schema has no sizeInBytes column, and asking
+    // for one fails with "column t0.sizeInBytes does not exist".
+    expect(pickVariantUrl({ ...file, size: 1 })).toBe("/uploads/hero.png");
   });
 
   it("uses the widest format that fits when the original is too heavy", () => {
     const url = pickVariantUrl({
       ...file,
-      sizeInBytes: MAX_REFERENCE_BYTES + 1,
+      size: MAX_REFERENCE_BYTES / 1024 + 1,
       formats: {
-        // `size` on a format is in KB, unlike sizeInBytes on the row.
         small: { url: "/uploads/small_hero.png", size: 40, width: 500 },
         large: { url: "/uploads/large_hero.png", size: 300, width: 1000 },
       },
@@ -75,15 +76,69 @@ describe("pickVariantUrl", () => {
     // Dropping the reference silently would retouch nothing at all.
     const url = pickVariantUrl({
       ...file,
-      sizeInBytes: MAX_REFERENCE_BYTES + 1,
+      size: MAX_REFERENCE_BYTES / 1024 + 1,
       formats: { large: { url: "/uploads/large_hero.png", size: 99_999, width: 1000 } },
     });
     expect(url).toBe("/uploads/hero.png");
   });
 
   it("copes with a file that has no formats at all", () => {
-    expect(pickVariantUrl({ ...file, sizeInBytes: MAX_REFERENCE_BYTES + 1, formats: null })).toBe(
+    expect(pickVariantUrl({ ...file, size: MAX_REFERENCE_BYTES / 1024 + 1, formats: null })).toBe(
       "/uploads/hero.png",
     );
+  });
+});
+
+describe("the columns read from the upload table", () => {
+  /**
+   * These are attribute names, and an unknown one is passed to the database
+   * verbatim: `sizeInBytes` — which the upload service puts on the in-memory
+   * entity but never declares as an attribute — produced
+   * "column t0.sizeInBytes does not exist" on every retouch.
+   */
+  it("asks for no column the file content-type does not declare", () => {
+    const declared = [
+      "id",
+      "documentId",
+      "name",
+      "alternativeText",
+      "caption",
+      "width",
+      "height",
+      "formats",
+      "hash",
+      "ext",
+      "mime",
+      "size",
+      "url",
+      "previewUrl",
+      "provider",
+      "provider_metadata",
+      "folderPath",
+    ];
+    for (const field of REFERENCE_FIELDS) {
+      expect(declared, `"${field}" is not an attribute of plugin::upload.file`).toContain(field);
+    }
+  });
+
+  it("never asks for sizeInBytes", () => {
+    expect(REFERENCE_FIELDS).not.toContain("sizeInBytes");
+  });
+
+  it("selects exactly that list when loading references", async () => {
+    let selected: unknown;
+    const strapi = {
+      config: { get: () => "" },
+      db: {
+        query: () => ({
+          findMany: async ({ select }: { select: string[] }) => {
+            selected = select;
+            return [];
+          },
+        }),
+      },
+    } as never;
+    await loadReferences(strapi, [1]).catch(() => undefined);
+    expect(selected).toEqual(REFERENCE_FIELDS);
   });
 });

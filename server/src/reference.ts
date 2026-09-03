@@ -27,18 +27,32 @@ interface FileRow {
   name: string;
   url: string;
   mime: string;
-  sizeInBytes?: number;
+  /**
+   * KILOBYTES. The upload content-type declares `size` (decimal) and nothing
+   * else: `sizeInBytes` exists only on the in-memory entity the upload service
+   * builds, never as a column — selecting it fails with
+   * "column t0.sizeInBytes does not exist".
+   */
+  size?: number;
+  /** Per-format `size` is in kilobytes too. */
   formats?: Record<string, { url?: string; size?: number; width?: number }> | null;
 }
 
+/**
+ * Columns read from `plugin::upload.file`. Every name here MUST be a declared
+ * attribute of the upload content-type: an unknown one reaches the database
+ * verbatim and fails there, not in review.
+ */
+export const REFERENCE_FIELDS = ["id", "documentId", "name", "url", "mime", "size", "formats"];
+
 /** The url to read: the original, or the largest format that fits the budget. */
 export function pickVariantUrl(file: FileRow, maxBytes = MAX_REFERENCE_BYTES): string {
-  const originalBytes = file.sizeInBytes ?? 0;
+  const originalBytes = (file.size ?? 0) * 1024;
   if (!originalBytes || originalBytes <= maxBytes) return file.url;
 
   const candidates = Object.values(file.formats ?? {})
     .filter((format): format is { url: string; size?: number; width?: number } => Boolean(format?.url))
-    // `size` on a format is in KB, unlike sizeInBytes on the row.
+    // Both the row and the formats measure in KB.
     .map((format) => ({ url: format.url, bytes: (format.size ?? 0) * 1024, width: format.width ?? 0 }))
     .filter((format) => format.bytes > 0 && format.bytes <= maxBytes)
     .sort((a, b) => b.width - a.width);
@@ -78,7 +92,7 @@ export async function loadReferences(
   if (!ids.length) return [];
 
   const rows = (await strapi.db.query(FILE_UID).findMany({
-    select: ["id", "documentId", "name", "url", "mime", "sizeInBytes", "formats"],
+    select: REFERENCE_FIELDS,
     where: { id: { $in: ids } },
   })) as FileRow[];
   const byId = new Map(rows.map((row) => [row.id, row]));

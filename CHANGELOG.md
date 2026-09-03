@@ -7,6 +7,19 @@ carry breaking changes.
 
 ## [Unreleased]
 
+## [0.2.4] — 2026-09-03
+
+### Fixed
+
+- **Retouching failed on every database.** Reading a reference image selected
+  `sizeInBytes`, which the upload content-type does not declare — the upload
+  service builds it on the in-memory entity, but there is no such column:
+  *"column t0.sizeInBytes does not exist"*. It now reads `size`, the declared
+  attribute, and measures in the kilobytes that column actually holds. A test
+  pins the selected columns to the schema, which is what the mocked tests were
+  missing.
+
+
 ## [0.2.3] — 2026-09-03
 
 ### Changed
@@ -104,7 +117,8 @@ First release.
 - Strapi's Media Library page and asset picker cannot be extended — see the
   README for why, and what is done instead.
 
-[Unreleased]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.0...v0.2.1
