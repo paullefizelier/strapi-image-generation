@@ -1,0 +1,90 @@
+{
+  "name": "strapi-plugin-image-gen",
+  "version": "0.1.0",
+  "description": "Generate and retouch Media Library images from inside Strapi, with Google's Nano Banana models. Generated files become ordinary assets — thumbnails, responsive formats, provider storage.",
+  "keywords": [
+    "strapi",
+    "plugin",
+    "media-library",
+    "image-generation",
+    "nano-banana",
+    "gemini"
+  ],
+  "license": "MIT",
+  "author": "Paul Lefizelier",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paullefizelier/strapi-plugin-image-gen.git"
+  },
+  "homepage": "https://github.com/paullefizelier/strapi-plugin-image-gen#readme",
+  "bugs": {
+    "url": "https://github.com/paullefizelier/strapi-plugin-image-gen/issues"
+  },
+  "type": "commonjs",
+  "exports": {
+    "./package.json": "./package.json",
+    "./strapi-admin": {
+      "types": "./dist/admin/src/index.d.ts",
+      "source": "./admin/src/index.ts",
+      "import": "./dist/admin/index.mjs",
+      "require": "./dist/admin/index.js",
+      "default": "./dist/admin/index.js"
+    },
+    "./strapi-server": {
+      "types": "./dist/server/src/index.d.ts",
+      "source": "./server/src/index.ts",
+      "import": "./dist/server/index.mjs",
+      "require": "./dist/server/index.js",
+      "default": "./dist/server/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "strapi-plugin build",
+    "watch": "strapi-plugin watch",
+    "verify": "strapi-plugin verify",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "fs-extra": "^11.2.0"
+  },
+  "devDependencies": {
+    "@strapi/design-system": "^2.0.0-rc.29",
+    "@strapi/icons": "^2.0.0-rc.29",
+    "@strapi/sdk-plugin": "^5.3.2",
+    "@strapi/strapi": "^5.0.0",
+    "@strapi/typescript-utils": "^5.0.0",
+    "@strapi/utils": "^5.0.0",
+    "@types/fs-extra": "^11.0.4",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "styled-components": "^6.1.11",
+    "typescript": "^5.5.4",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "@strapi/design-system": "^2.0.0-rc.29",
+    "@strapi/icons": "^2.0.0-rc.29",
+    "@strapi/strapi": "^5.0.0",
+    "@strapi/utils": "^5.0.0",
+    "react": "^17.0.0 || ^18.0.0",
+    "react-dom": "^17.0.0 || ^18.0.0",
+    "styled-components": "^6.0.0"
+  },
+  "strapi": {
+    "kind": "plugin",
+    "name": "image-gen",
+    "displayName": "Image Gen",
+    "description": "Generate and retouch Media Library images with Nano Banana."
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
