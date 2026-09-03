@@ -143,6 +143,15 @@ This calls Google's **Interactions API**
 that the endpoint, the auth and the body all differ — and that
 `gemini-2.5-flash-image`, the original Nano Banana, is deprecated.
 
+Two traps in the response, both learned the hard way. `interaction.output_image`
+appears throughout the documentation but is a **convenience accessor on the
+client SDK objects** — it is not a field of the JSON that arrives over HTTP,
+where the bytes are content blocks inside `steps[].content[]`. And the docs
+publish no example of a raw response body at all, so this parser reads both
+shapes and tolerates the `interaction` wrapper being absent. When no image comes
+back, it repeats what the model *said* rather than guessing: a refusal normally
+explains itself.
+
 Assets are created through `strapi.plugin('upload').service('upload')`, which is
 what earns the thumbnails and responsive formats. That service requires a file
 on disk — `enhanceAndValidateFile` wraps `fs.createReadStream(file.filepath)`

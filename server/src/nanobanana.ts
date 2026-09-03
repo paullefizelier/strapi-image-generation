@@ -112,12 +112,65 @@ export interface GeneratedImage {
   interactionId?: string;
 }
 
-interface InteractionResponse {
-  interaction?: {
-    id?: string;
-    output_image?: { data?: string; mime_type?: string };
-  };
+/**
+ * The response shape.
+ *
+ * The docs show SDK code (`interaction.output_image`) but publish no example of
+ * a raw REST body — and `output_image` is a CONVENIENCE ACCESSOR on the client
+ * objects, not a field of the JSON that comes back over HTTP. The bytes live in
+ * content blocks inside `steps`. Both are read here, and an `interaction`
+ * wrapper is tolerated, because the documentation never says whether the raw
+ * body has one.
+ */
+interface ContentBlock {
+  type?: string;
+  data?: string;
+  text?: string;
+  mime_type?: string;
+  mimeType?: string;
+}
+
+interface InteractionBody {
+  id?: string;
+  steps?: { type?: string; content?: ContentBlock[] }[];
+  output_image?: { data?: string; mime_type?: string; mimeType?: string };
+  interaction?: InteractionBody;
   error?: { message?: string };
+}
+
+const rootOf = (body: unknown): InteractionBody => {
+  const value = (body ?? {}) as InteractionBody;
+  return value.interaction ?? value;
+};
+
+const blocksOf = (body: InteractionBody): ContentBlock[] =>
+  (body.steps ?? []).flatMap((step) => step.content ?? []);
+
+const isImageBlock = (block: ContentBlock): boolean =>
+  Boolean(block?.data) && (block.type === "image" || Boolean(block.mime_type ?? block.mimeType));
+
+/** The image the model drew, or null when it drew none. */
+export function findImage(body: unknown): { data: string; mimeType: string } | null {
+  const root = rootOf(body);
+
+  const convenience = root.output_image;
+  if (convenience?.data) {
+    return { data: convenience.data, mimeType: convenience.mime_type ?? convenience.mimeType ?? "" };
+  }
+
+  // "the LAST generated image block" — an interleaved answer can hold several.
+  const images = blocksOf(root).filter(isImageBlock);
+  const last = images[images.length - 1];
+  return last?.data ? { data: last.data, mimeType: last.mime_type ?? last.mimeType ?? "" } : null;
+}
+
+/** Whatever the model said instead of drawing — usually why it declined. */
+export function findText(body: unknown): string {
+  return blocksOf(rootOf(body))
+    .filter((block) => block.type === "text" && block.text?.trim())
+    .map((block) => block.text!.trim())
+    .join(" ")
+    .trim();
 }
 
 /**
@@ -126,22 +179,26 @@ interface InteractionResponse {
  * "generation failed".
  */
 export function parseResponse(body: unknown, status?: number): GeneratedImage {
-  const response = (body ?? {}) as InteractionResponse;
-  if (response.error?.message) throw new Error(response.error.message);
+  const root = rootOf(body);
+  if (root.error?.message) throw new Error(root.error.message);
 
-  const image = response.interaction?.output_image;
-  if (!image?.data) {
+  const image = findImage(body);
+  if (!image) {
+    if (status && status >= 400) throw new Error(`Image API returned ${status}`);
+    // The model usually SAYS why it declined. Repeating its words beats a
+    // guess about rewording the prompt.
+    const said = findText(body);
     throw new Error(
-      status && status >= 400
-        ? `Image API returned ${status}`
-        : "The model returned no image. Try rewording the prompt — a request it declines to draw comes back empty.",
+      said
+        ? `The model answered without an image: ${said}`
+        : "The model returned no image and gave no reason. Try rewording the prompt.",
     );
   }
 
   return {
     buffer: Buffer.from(image.data, "base64"),
-    mimeType: image.mime_type || "image/png",
-    interactionId: response.interaction?.id,
+    mimeType: image.mimeType || "image/jpeg",
+    interactionId: root.id,
   };
 }
 
@@ -198,7 +255,7 @@ export async function generateImage(
   // Read the body whatever the status: the useful message lives in it.
   const body: unknown = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const message = (body as InteractionResponse).error?.message;
+    const message = rootOf(body).error?.message;
     throw new Error(message || `Image API returned ${response.status}`);
   }
   return parseResponse(body, response.status);

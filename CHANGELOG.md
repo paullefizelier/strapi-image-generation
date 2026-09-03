@@ -7,6 +7,21 @@ carry breaking changes.
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-09-03
+
+### Fixed
+
+- **Successful generations were read as refusals.** The parser looked for
+  `interaction.output_image`, which the documentation uses everywhere but which
+  is a convenience accessor on the client SDK objects — the raw HTTP body puts
+  the bytes in `steps[].content[]`. It now reads the real shape, still accepts
+  the SDK one, and tolerates the `interaction` wrapper being absent, since the
+  docs publish no example of a raw response body.
+- **A refusal now quotes the model.** When no image comes back, the error
+  repeats what the model said instead of guessing that the prompt needs
+  rewording — a decline normally explains itself.
+
+
 ## [0.2.1] — 2026-09-03
 
 ### Fixed
@@ -78,7 +93,8 @@ First release.
 - Strapi's Media Library page and asset picker cannot be extended — see the
   README for why, and what is done instead.
 
-[Unreleased]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/paullefizelier/strapi-plugin-image-gen/releases/tag/v0.1.0

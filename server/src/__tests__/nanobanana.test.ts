@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildRequest, composePrompt, DEFAULT_REQUEST_TIMEOUT_MS, generateImage, parseResponse } from "../nanobanana";
+import {
+  buildRequest,
+  composePrompt,
+  DEFAULT_REQUEST_TIMEOUT_MS,
+  findImage,
+  findText,
+  generateImage,
+  parseResponse,
+} from "../nanobanana";
 
 /**
  * These tests pin the wire contract of the Interactions API. It is deliberately
@@ -103,31 +111,77 @@ describe("the style inside a request", () => {
   });
 });
 
-describe("parseResponse", () => {
-  it("decodes the image from interaction.output_image", () => {
-    const data = Buffer.from("hello").toString("base64");
-    const result = parseResponse({
-      interaction: { id: "int_9", output_image: { data, mime_type: "image/webp" } },
-    });
-    expect(result.buffer.toString()).toBe("hello");
-    expect(result.mimeType).toBe("image/webp");
+describe("reading the answer", () => {
+  const b64 = (text: string) => Buffer.from(text).toString("base64");
+
+  /**
+   * The real REST shape. `output_image` is an SDK convenience accessor and is
+   * NOT in the JSON that comes over HTTP — the bytes are content blocks inside
+   * `steps`. Reading only the accessor made every successful generation look
+   * like a refusal.
+   */
+  const steps = (blocks: unknown[]) => ({
+    id: "int_9",
+    steps: [{ type: "model_output", content: blocks }],
+  });
+
+  it("finds the image in steps[].content[] — the shape HTTP actually returns", () => {
+    const result = parseResponse(
+      steps([{ type: "image", mime_type: "image/jpeg", data: b64("jpeg") }]),
+    );
+    expect(result.buffer.toString()).toBe("jpeg");
+    expect(result.mimeType).toBe("image/jpeg");
     expect(result.interactionId).toBe("int_9");
   });
 
-  it("defaults the mime type when the API omits it", () => {
-    const data = Buffer.from("x").toString("base64");
-    expect(parseResponse({ interaction: { output_image: { data } } }).mimeType).toBe("image/png");
+  it("takes the LAST image when the answer interleaves several", () => {
+    const result = parseResponse(
+      steps([
+        { type: "image", mime_type: "image/jpeg", data: b64("first") },
+        { type: "text", text: "and here is a better one" },
+        { type: "image", mime_type: "image/jpeg", data: b64("second") },
+      ]),
+    );
+    expect(result.buffer.toString()).toBe("second");
   });
 
-  it("surfaces the provider's own error message", () => {
+  it("still reads the SDK-style output_image, in case a body carries one", () => {
+    const result = parseResponse({
+      interaction: { id: "int_1", output_image: { data: b64("x"), mime_type: "image/png" } },
+    });
+    expect(result.mimeType).toBe("image/png");
+  });
+
+  it("tolerates the interaction wrapper being absent — the docs never say", () => {
+    expect(findImage(steps([{ type: "image", data: b64("y") }]))?.data).toBe(b64("y"));
+    expect(findImage({ interaction: steps([{ type: "image", data: b64("y") }]) })?.data).toBe(b64("y"));
+  });
+
+  it("repeats what the model SAID instead of guessing about the prompt", () => {
+    // A refusal usually explains itself; echoing it beats "try rewording".
+    expect(() =>
+      parseResponse(steps([{ type: "text", text: "I can't create images of real people." }])),
+    ).toThrow(/I can't create images of real people/);
+  });
+
+  it("says so plainly when there is neither image nor explanation", () => {
+    expect(() => parseResponse(steps([]))).toThrow(/no image and gave no reason/);
+  });
+
+  it("surfaces the provider's error message above everything else", () => {
     expect(() => parseResponse({ error: { message: "API key not valid" } })).toThrow(
       "API key not valid",
     );
   });
 
-  it("explains an empty answer rather than throwing something opaque", () => {
-    // A prompt the model declines comes back 200 with no image.
-    expect(() => parseResponse({ interaction: {} })).toThrow(/no image/i);
+  it("collects text across blocks", () => {
+    expect(findText(steps([{ type: "text", text: " one " }, { type: "text", text: "two" }]))).toBe(
+      "one two",
+    );
+  });
+
+  it("defaults the mime type when a block omits it", () => {
+    expect(parseResponse(steps([{ type: "image", data: b64("z") }])).mimeType).toBe("image/jpeg");
   });
 });
 
