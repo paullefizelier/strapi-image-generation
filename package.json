@@ -1,6 +1,6 @@
 {
   "name": "strapi-plugin-image-gen",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Generate and retouch Media Library images from inside Strapi, with Google's Nano Banana models. Generated files become ordinary assets — thumbnails, responsive formats, provider storage.",
   "keywords": [
     "strapi",

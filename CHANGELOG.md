@@ -7,6 +7,8 @@ carry breaking changes.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-03
+
 ### Added
 
 - **A house style.** A prompt fragment set in the settings and folded into every
@@ -63,5 +65,6 @@ First release.
 - Strapi's Media Library page and asset picker cannot be extended — see the
   README for why, and what is done instead.
 
-[Unreleased]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/paullefizelier/strapi-plugin-image-gen/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/paullefizelier/strapi-plugin-image-gen/releases/tag/v0.1.0
