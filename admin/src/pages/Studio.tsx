@@ -12,11 +12,12 @@ import {
   Typography,
 } from "@strapi/design-system";
 import { Trash } from "@strapi/icons";
-import { Layouts, Page, useNotification } from "@strapi/strapi/admin";
+import { Layouts, Page, useNotification, useStrapiApp } from "@strapi/strapi/admin";
 import GenerateDialog from "../components/GenerateDialog";
 import { useImageGenApi } from "../api";
+import { integration } from "../integration";
 import { getTranslation } from "../getTranslation";
-import type { JournalEntry, PublicSettings } from "../types";
+import type { Health, JournalEntry, PublicSettings } from "../types";
 
 /**
  * The studio: generate or retouch, and see what has already been generated.
@@ -38,6 +39,47 @@ const Studio = () => {
   const [settings, setSettings] = React.useState<PublicSettings | null>(null);
   const [entries, setEntries] = React.useState<JournalEntry[]>([]);
   const [spent, setSpent] = React.useState(0);
+  const [health, setHealth] = React.useState<Health | null>(null);
+
+  /**
+   * The plugin hooks into Strapi internals that no version promises. When one
+   * of them moves, the plugin degrades quietly by design — it would rather show
+   * no button than break a media field. Quietly is the problem: this panel is
+   * where a silent degradation becomes something someone can see.
+   */
+  const components = useStrapiApp("ImageGenStudio", (state) => state.components);
+  const hasPicker = Boolean(components?.["media-library"]);
+
+  const integrationIssues = React.useMemo(() => {
+    const issues: string[] = [];
+    if (!integration.mediaField) {
+      issues.push(
+        t(
+          "studio.hook-media-field",
+          "The generate button inside content entries is not installed — Strapi's media field registry could not be read.",
+        ),
+      );
+    }
+    if (!hasPicker) {
+      issues.push(
+        t(
+          "studio.hook-picker",
+          "Reference images cannot be chosen from the library — the media picker component is missing.",
+        ),
+      );
+    }
+    if (health?.strapi.status === "newer") {
+      issues.push(
+        t(
+          "studio.hook-version",
+          "Strapi {running} is newer than {tested}, the version these hooks were verified against.",
+          { running: health.strapi.running, tested: health.strapi.tested },
+        ),
+      );
+    }
+    return issues;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasPicker, health]);
   const [deleting, setDeleting] = React.useState<number | null>(null);
 
   // Deleted images leave the list but stay in the count and the total: the
@@ -48,10 +90,16 @@ const Studio = () => {
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const [cfg, journal] = await Promise.all([api.getSettings(), api.getJournal()]);
+      const [cfg, journal, status] = await Promise.all([
+        api.getSettings(),
+        api.getJournal(),
+        // A failing health check must not hide the studio itself.
+        api.getHealth().catch(() => null),
+      ]);
       setSettings(cfg);
       setEntries(journal.entries);
       setSpent(journal.totalCost);
+      setHealth(status);
     } finally {
       setLoading(false);
     }
@@ -134,6 +182,32 @@ const Studio = () => {
                 </Typography>
               ) : null}
             </Flex>
+
+            {integrationIssues.length ? (
+              <Box padding={3} background="warning100" hasRadius>
+                <Flex direction="column" alignItems="start" gap={1}>
+                  <Typography variant="pi" fontWeight="bold" textColor="warning700">
+                    {t("studio.integration-degraded", "Some hooks into Strapi did not catch")}
+                  </Typography>
+                  {integrationIssues.map((issue) => (
+                    <Typography key={issue} variant="pi" textColor="warning700">
+                      · {issue}
+                    </Typography>
+                  ))}
+                </Flex>
+              </Box>
+            ) : (
+              <Typography variant="pi" textColor="neutral500">
+                {t("studio.integration-ok", "In-entry button and library picker installed · {strapi}", {
+                  strapi: health
+                    ? t("studio.strapi-version", "Strapi {running}, verified against {tested}", {
+                        running: health.strapi.running,
+                        tested: health.strapi.tested,
+                      })
+                    : "",
+                })}
+              </Typography>
+            )}
 
             {visible.length === 0 ? (
               <Page.NoData

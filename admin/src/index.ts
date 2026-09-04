@@ -1,6 +1,7 @@
 import { PLUGIN_ID } from "./pluginId";
 import { prefixPluginTranslations } from "./getTranslation";
 import { withGeneration } from "./components/MediaFieldWithGeneration";
+import { integration } from "./integration";
 
 /**
  * Registration.
@@ -70,6 +71,8 @@ export default {
     const original = app.library?.fields?.media;
     if (original) {
       app.addFields({ type: "media", Component: withGeneration(original as never) });
+      // Recorded, not just logged: the studio reports it where someone looks.
+      integration.mediaField = true;
     } else {
       // eslint-disable-next-line no-console
       console.warn(

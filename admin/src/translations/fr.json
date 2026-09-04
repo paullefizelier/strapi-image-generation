@@ -78,10 +78,16 @@
   "studio.derived-gone": "une image supprimée",
   "studio.folder": "Enregistrées dans « {folder} »",
   "studio.from-references": "d'après {count} référence(s)",
+  "studio.hook-media-field": "Le bouton de génération dans les contenus n’est pas installé — le registre des champs média de Strapi n’a pas pu être lu.",
+  "studio.hook-picker": "Les images de référence ne peuvent pas être choisies dans la médiathèque — le composant sélecteur est absent.",
+  "studio.hook-version": "Strapi {running} est plus récent que {tested}, la version avec laquelle ces accroches ont été vérifiées.",
+  "studio.integration-degraded": "Certains points d’accroche dans Strapi n’ont pas pris",
+  "studio.integration-ok": "Bouton dans les contenus et sélecteur de médias installés · {strapi}",
   "studio.loading": "Chargement…",
   "studio.new": "Nouvelle image",
   "studio.not-configured": "Aucune clé API. Renseignez-en une dans Réglages → Image Gen pour commencer.",
   "studio.spent": "{amount} $ dépensés",
+  "studio.strapi-version": "Strapi {running}, vérifié avec {tested}",
   "studio.subtitle": "Générez ou retouchez des images. Tout arrive dans la médiathèque comme un média ordinaire.",
   "studio.title": "Studio d'images"
 }

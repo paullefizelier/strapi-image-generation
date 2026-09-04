@@ -1,6 +1,7 @@
 import type { Core } from "@strapi/strapi";
 import { assetNameFor, createAsset, deleteAsset, fileNameFor } from "./assets";
 import { reframeInstruction, reframeTitle } from "./reframe";
+import { health } from "./diagnostics";
 import { ensureFolder } from "./folder";
 import {
   appendJournal,
@@ -307,6 +308,17 @@ const controllers = {
     },
   }),
 
+  /**
+   * What the plugin is running against. The integration points are Strapi
+   * internals, so the version it was verified with is worth stating rather than
+   * assuming — see diagnostics.ts.
+   */
+  health: ({ strapi }: { strapi: Core.Strapi }) => ({
+    async get(ctx: Ctx) {
+      ctx.body = health(String(strapi.config.get("info.strapi", "")));
+    },
+  }),
+
   journal: ({ strapi }: { strapi: Core.Strapi }) => ({
     async list(ctx: Ctx) {
       const entries = await readJournal(strapi);
@@ -354,6 +366,7 @@ const routes = {
     routes: [
       adminRoute("GET", "/catalogue", "catalogue.get", [ACTIONS.generate]),
       adminRoute("POST", "/generate", "generate.run", [ACTIONS.generate]),
+      adminRoute("GET", "/health", "health.get", [ACTIONS.generate]),
       adminRoute("GET", "/journal", "journal.list", [ACTIONS.generate]),
       adminRoute("DELETE", "/journal/:fileId", "journal.remove", [ACTIONS.generate]),
       adminRoute("GET", "/settings", "settings.get", [ACTIONS.generate]),

@@ -82,3 +82,7 @@ export interface GenerateResult {
   interactionId?: string;
   entry: JournalEntry;
 }
+
+export interface Health {
+  strapi: { running: string; tested: string; status: "ok" | "newer" | "older" | "unknown" };
+}

@@ -171,6 +171,7 @@ permission.
 | `GET /image-gen/catalogue` | `generate` | Models, sizes, prices, ratios |
 | `POST /image-gen/generate` | `generate` | `{ prompt, title?, model?, imageSize?, aspectRatio?, referenceFileIds?, previousInteractionId? }`<br>or `{ reframeOf, aspectRatio }` to decline an existing image into another ratio — no prompt, no house style |
 | `GET /image-gen/journal` | `generate` | The provenance log and the running total |
+| `GET /image-gen/health` | `generate` | Running Strapi vs the version the hooks were verified against |
 | `DELETE /image-gen/journal/:fileId` | `generate` | Deletes the asset. 404 for a file this plugin did not generate |
 | `GET /image-gen/settings` | `generate` | Redacted — never returns the key |
 | `PUT /image-gen/settings` | `settings` | An absent `apiKey` keeps the stored one; `""` clears it |
@@ -205,9 +206,21 @@ as Strapi's own "add from URL" does, and cleaned up in a `finally`.
 npm install && npm test && npm run build && npm run verify
 ```
 
+Tests run on plain Node for the server and jsdom for the admin — admin files
+declare `@vitest-environment jsdom` in their own docblock, so there is no config
+split. The admin suite is the regression net for the integration points above.
+
 ## Compatibility
 
-Strapi v5 (developed against 5.51). Node ≥ 18.
+Strapi v5, verified against **5.51**. Node ≥ 18.
+
+The integration points are Strapi internals — the media field registry
+(`app.library.fields.media`), `useField`, and the `media-library` component —
+none of which any version promises. When one of them moves, the plugin
+registers nothing rather than break your media field, and the studio says so:
+it reports the in-entry button, the reference picker, and your Strapi version
+against the one these hooks were verified with. A silent degradation is the
+failure mode this plugin has already lived through once.
 
 ## License
 

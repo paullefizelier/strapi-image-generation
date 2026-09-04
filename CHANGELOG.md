@@ -7,6 +7,42 @@ carry breaking changes.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-09-04
+
+### Added
+
+- **The admin is tested now.** Ninety-six tests covered pure server logic, and
+  every bug that actually reached an editor was outside them — a button that
+  never rendered for three releases, a column that does not exist, a response
+  shape the documentation does not publish. A plugin whose whole value is a UI
+  cannot claim stability without a single UI test.
+
+  `MediaFieldWithGeneration` now has a regression suite: the button appears on
+  an empty field, says *Retouch* when the field already holds an image, stays
+  away from a disabled field (which is also the history view), and fills the
+  form through `onChange(name, value)` — appending rather than replacing on a
+  multiple field. Reintroducing the old `props.onChange` mixup fails three of
+  them, which is the point.
+
+  The design system is stubbed rather than loaded: its packages declare
+  `"type": "module"` with a CommonJS `main`, so Node resolves the pair and
+  throws *"exports is not defined in ES module scope"*. What those components
+  look like is checked by `tsc` against the real prop types; what they do is
+  checked here.
+
+- **The studio says whether the plugin actually hooked into Strapi.** The
+  integration points are internals — `app.library.fields.media`, `useField`, the
+  `media-library` component — while `peerDependencies` says `^5.0.0`, a range
+  much wider than anything verified. When a hook does not catch, the plugin
+  degrades on purpose rather than break a media field; the new panel is what
+  makes that degradation visible instead of a `console.warn` nobody reads.
+
+  It reports the in-entry button, the reference picker, and the running Strapi
+  against the version the hooks were verified with (`GET /image-gen/health`).
+  Patch releases are ignored on purpose: flagging every one of them would train
+  people to ignore the warning.
+
+
 ## [0.4.1] — 2026-09-04
 
 ### Fixed

@@ -4,6 +4,7 @@ import type {
   Catalogue,
   GenerateInput,
   GenerateResult,
+  Health,
   JournalEntry,
   PublicSettings,
 } from "./types";
@@ -34,6 +35,10 @@ export function useImageGenApi() {
     },
     async generate(input: GenerateInput): Promise<GenerateResult> {
       const { data } = await post<GenerateResult>(`${base}/generate`, input);
+      return data;
+    },
+    async getHealth(): Promise<Health> {
+      const { data } = await get<Health>(`${base}/health`);
       return data;
     },
     async getJournal(): Promise<{ entries: JournalEntry[]; totalCost: number }> {

@@ -78,10 +78,16 @@
   "studio.derived-gone": "a deleted image",
   "studio.folder": "Saved to “{folder}”",
   "studio.from-references": "from {count} reference(s)",
+  "studio.hook-media-field": "The generate button inside content entries is not installed — Strapi's media field registry could not be read.",
+  "studio.hook-picker": "Reference images cannot be chosen from the library — the media picker component is missing.",
+  "studio.hook-version": "Strapi {running} is newer than {tested}, the version these hooks were verified against.",
+  "studio.integration-degraded": "Some hooks into Strapi did not catch",
+  "studio.integration-ok": "In-entry button and library picker installed · {strapi}",
   "studio.loading": "Loading…",
   "studio.new": "New image",
   "studio.not-configured": "No API key yet. Add one under Settings → Image Gen to start generating.",
   "studio.spent": "${amount} spent",
+  "studio.strapi-version": "Strapi {running}, verified against {tested}",
   "studio.subtitle": "Generate or retouch images. Everything lands in the Media Library as an ordinary asset.",
   "studio.title": "Image studio"
 }
