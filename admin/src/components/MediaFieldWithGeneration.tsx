@@ -1,6 +1,8 @@
 import * as React from "react";
 import { useIntl } from "react-intl";
 import { Button, Flex } from "@strapi/design-system";
+import { Sparkle } from "@strapi/icons";
+import { useField } from "@strapi/strapi/admin";
 import GenerateDialog from "./GenerateDialog";
 import { getTranslation } from "../getTranslation";
 import type { Asset } from "../types";
@@ -17,12 +19,22 @@ import type { Asset } from "../types";
  *
  * Generating from here also fills the field directly, which is fewer steps than
  * the picker it sits next to — generate, close, reopen, hunt for the file.
+ *
+ * IMPORTANT — where the value comes from. A field in the registry does NOT
+ * receive `value`/`onChange` as props: the Content Manager renders it with
+ * `jsx(CustomInput, { ...props, hint, disabled })` and the field reads the form
+ * itself through `useField(name)`, exactly as `MediaLibraryInput` does. Reading
+ * `props.onChange` here finds `undefined`, which is how this button spent three
+ * releases never rendering at all.
+ *
+ * `useField` needs a Form context. Both places that render a registry media
+ * field provide one: the edit view, and the history view — which wraps it in
+ * its own `<Form method="PUT" disabled>` (VersionInputRenderer), where
+ * `disabled` also keeps this button out of a read-only past version.
  */
 
 interface MediaFieldProps {
   name: string;
-  value?: unknown;
-  onChange?: (event: { target: { name: string; value: unknown; type: string } }) => void;
   attribute?: { multiple?: boolean };
   disabled?: boolean;
   [key: string]: unknown;
@@ -34,7 +46,8 @@ export function withGeneration(
   const MediaFieldWithGeneration = (props: MediaFieldProps) => {
     const { formatMessage } = useIntl();
     const [open, setOpen] = React.useState(false);
-    const { name, value, onChange, attribute, disabled } = props;
+    const { name, attribute, disabled } = props;
+    const { value, onChange } = useField(name);
 
     const t = (id: string, defaultMessage: string) =>
       formatMessage({ id: getTranslation(id), defaultMessage });
@@ -52,25 +65,30 @@ export function withGeneration(
     }, [value]);
 
     const use = (asset: Asset) => {
-      if (!onChange) return;
+      // The form's onChange takes (name, value) — not a DOM-style event.
       const next = attribute?.multiple
         ? [...(Array.isArray(value) ? value : []), asset]
         : asset;
-      onChange({ target: { name, value: next, type: "media" } });
+      onChange(name, next);
     };
 
     return (
       <Flex direction="column" alignItems="stretch" gap={2}>
         <Original {...props} />
-        {onChange && !disabled ? (
+        {disabled ? null : (
           <Flex justifyContent="flex-end">
-            <Button variant="tertiary" size="S" onClick={() => setOpen(true)}>
+            <Button
+              variant="secondary"
+              size="S"
+              startIcon={<Sparkle />}
+              onClick={() => setOpen(true)}
+            >
               {current.length
                 ? t("field.retouch", "Retouch with AI")
                 : t("field.generate", "Generate an image")}
             </Button>
           </Flex>
-        ) : null}
+        )}
         <GenerateDialog
           open={open}
           onClose={() => setOpen(false)}

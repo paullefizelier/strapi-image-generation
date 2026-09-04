@@ -7,6 +7,29 @@ carry breaking changes.
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-09-04
+
+### Fixed
+
+- **The in-field generate button never appeared.** Since the first release, the
+  media field decorator rendered its button only `if (onChange && !disabled)` —
+  and a field in Strapi's registry never receives `onChange` as a prop. The
+  Content Manager renders it as `jsx(CustomInput, { ...props, hint, disabled })`
+  (`InputRenderer.mjs`, which contains no `onChange` at all) and the field reads
+  the form itself through `useField(name)`, exactly as `MediaLibraryInput` does.
+  The condition was therefore always false: the wrapper mounted, the media field
+  worked, and the button silently did not exist. It now reads `useField(name)`,
+  and calls the form's `onChange(name, value)` rather than a DOM-style event.
+
+  The button is also easier to find — a secondary button with the admin's own
+  sparkle icon, rather than a faint tertiary link.
+
+  `useField` needs a Form context. Both renderers of a registry media field
+  provide one: the edit view, and the history view, which wraps it in its own
+  `<Form method="PUT" disabled>` — where `disabled` keeps the button out of a
+  read-only past version.
+
+
 ## [0.4.0] — 2026-09-04
 
 ### Added
