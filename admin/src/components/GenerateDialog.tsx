@@ -4,6 +4,7 @@ import {
   Badge,
   Box,
   Button,
+  Checkbox,
   Field,
   Flex,
   Loader,
@@ -69,11 +70,20 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props)
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
   const [result, setResult] = React.useState<Asset | null>(null);
+  /** Extra ratios to decline the result into — one paid render each. */
+  const [extraRatios, setExtraRatios] = React.useState<string[]>([]);
+  const [variants, setVariants] = React.useState<Asset[]>([]);
+  /** Ratios that failed, with the reason — a lost variant must say why. */
+  const [failedRatios, setFailedRatios] = React.useState<{ ratio: string; message: string }[]>([]);
+  /** The ratio being drawn right now, so a run of several is not a blank wait. */
+  const [step, setStep] = React.useState("");
 
   React.useEffect(() => {
     if (!open) return;
     setReferences(initialReferences);
     setResult(null);
+    setVariants([]);
+    setFailedRatios([]);
     setError("");
     Promise.all([api.getCatalogue(), api.getSettings()])
       .then(([cat, cfg]) => {
@@ -94,13 +104,28 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props)
     if (spec && !spec.sizes.includes(imageSize)) setImageSize(spec.sizes[spec.sizes.length - 1]);
   }, [spec, imageSize]);
 
+  // Choosing the main ratio must not leave it selected as a declination too.
+  React.useEffect(() => {
+    setExtraRatios((current) => current.filter((ratio) => ratio !== aspectRatio));
+  }, [aspectRatio]);
+
   const cost = spec ? (spec.price[imageSize] ?? null) : null;
+  const imageCount = 1 + extraRatios.length;
+  // One ratio per call, so the bill is per image. The button says the total.
+  const totalCost = cost === null ? null : cost * imageCount;
   const canGenerate = Boolean(prompt.trim()) && !busy && settings?.configured;
+
+  const messageOf = (err: unknown) =>
+    (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+      ?.message ?? (err as Error).message;
 
   const generate = async () => {
     setBusy(true);
     setError("");
+    setVariants([]);
+    setFailedRatios([]);
     try {
+      setStep(aspectRatio);
       const { asset } = await api.generate({
         prompt: prompt.trim(),
         model,
@@ -111,13 +136,37 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props)
         title: title.trim(),
       });
       setResult(asset);
+
+      /**
+       * The declinations are separate calls, made here rather than server-side
+       * on purpose: the API draws one ratio per call, and four 55-second
+       * renders inside one HTTP request would pass the proxy's own timeout
+       * long before finishing. One request per ratio also means a failure on
+       * the third does not lose the first two.
+       */
+      const made: Asset[] = [];
+      const missed: { ratio: string; message: string }[] = [];
+      for (const ratio of extraRatios) {
+        setStep(ratio);
+        try {
+          const { asset: variant } = await api.generate({
+            reframeOf: asset.id,
+            aspectRatio: ratio,
+            model,
+            imageSize,
+          });
+          made.push(variant);
+          setVariants([...made]);
+        } catch (err) {
+          missed.push({ ratio, message: messageOf(err) });
+          setFailedRatios([...missed]);
+        }
+      }
     } catch (err) {
-      const message =
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
-          ?.message ?? (err as Error).message;
-      setError(message || t("dialog.error", "The image could not be generated."));
+      setError(messageOf(err) || t("dialog.error", "The image could not be generated."));
     } finally {
       setBusy(false);
+      setStep("");
     }
   };
 
@@ -171,6 +220,45 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props)
                       { folder: settings?.folderName ?? "" },
                     )}
                   </Typography>
+
+                  {variants.length ? (
+                    <Flex direction="column" alignItems="stretch" gap={2}>
+                      <Typography variant="sigma" textColor="neutral600">
+                        {t("dialog.variants", "Declinations ({count})", {
+                          count: variants.length,
+                        })}
+                      </Typography>
+                      <Flex gap={2} wrap="wrap" alignItems="start">
+                        {variants.map((variant) => (
+                          <Box
+                            key={variant.id}
+                            hasRadius
+                            overflow="hidden"
+                            background="neutral100"
+                            style={{ width: 120 }}
+                          >
+                            <img
+                              src={variant.url}
+                              alt=""
+                              style={{ display: "block", width: "100%", height: "auto" }}
+                            />
+                          </Box>
+                        ))}
+                      </Flex>
+                    </Flex>
+                  ) : null}
+
+                  {failedRatios.length ? (
+                    <Box padding={3} background="warning100" hasRadius>
+                      <Typography variant="pi" textColor="warning700">
+                        {t(
+                          "dialog.variants-failed",
+                          "The main image is saved. These ratios did not come back: {ratios}",
+                          { ratios: failedRatios.map((f) => `${f.ratio} (${f.message})`).join(" · ") },
+                        )}
+                      </Typography>
+                    </Box>
+                  ) : null}
                 </Flex>
               ) : (
                 <>
@@ -283,6 +371,38 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props)
                     </Field.Root>
                   </Flex>
 
+                  <Flex direction="column" alignItems="stretch" gap={2}>
+                    <Typography variant="sigma" textColor="neutral600">
+                      {t("dialog.also-in", "Also decline it into")}
+                    </Typography>
+                    <Flex gap={3} wrap="wrap">
+                      {(catalogue?.aspectRatios ?? [])
+                        .filter((ratio) => ratio !== aspectRatio)
+                        .map((ratio) => (
+                          <Checkbox
+                            key={ratio}
+                            checked={extraRatios.includes(ratio)}
+                            disabled={busy}
+                            onCheckedChange={(checked: boolean | "indeterminate") =>
+                              setExtraRatios((current) =>
+                                checked === true
+                                  ? [...current, ratio]
+                                  : current.filter((item) => item !== ratio),
+                              )
+                            }
+                          >
+                            {ratio}
+                          </Checkbox>
+                        ))}
+                    </Flex>
+                    <Typography variant="pi" textColor="neutral500">
+                      {t(
+                        "dialog.also-in-hint",
+                        "Each one is the SAME image extended to that shape — one extra render, billed like any other. Drawn one after another, so a long list takes a while.",
+                      )}
+                    </Typography>
+                  </Flex>
+
                   {spec ? (
                     <Typography variant="pi" textColor="neutral600">
                       {spec.note} · {t("dialog.cost", "About {cost} per image", { cost: money(cost) })}
@@ -344,7 +464,11 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props)
 
               {busy ? (
                 <Flex justifyContent="center" padding={4}>
-                  <Loader small>{t("dialog.working", "Drawing…")}</Loader>
+                  <Loader small>
+                    {imageCount > 1 && step
+                      ? t("dialog.working-ratio", "Drawing {ratio}…", { ratio: step })
+                      : t("dialog.working", "Drawing…")}
+                  </Loader>
                 </Flex>
               ) : null}
 
@@ -387,7 +511,12 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props)
               </Flex>
             ) : (
               <Button onClick={() => void generate()} disabled={!canGenerate} loading={busy}>
-                {t("dialog.generate", "Generate · {cost}", { cost: money(cost) })}
+                {imageCount > 1
+                  ? t("dialog.generate-many", "Generate {count} images · {cost}", {
+                      count: imageCount,
+                      cost: money(totalCost),
+                    })
+                  : t("dialog.generate", "Generate · {cost}", { cost: money(cost) })}
               </Button>
             )}
           </Modal.Footer>

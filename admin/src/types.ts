@@ -56,12 +56,15 @@ export interface JournalEntry {
   referenceFileIds: number[];
   estimatedCost: number | null;
   userId?: number | string;
+  /** Set when this image is another ratio of an existing one. */
+  derivedFromFileId?: number;
   /** Set once the asset has been deleted from the studio. */
   deletedAt?: string;
 }
 
 export interface GenerateInput {
-  prompt: string;
+  /** Required, unless `reframeOf` supplies the image to work from. */
+  prompt?: string;
   model?: string;
   imageSize?: string;
   aspectRatio?: string;
@@ -70,6 +73,8 @@ export interface GenerateInput {
   useStyle?: boolean;
   /** Names the asset. Empty asks the model for a short neutral one. */
   title?: string;
+  /** Decline this existing image into `aspectRatio` instead of drawing anew. */
+  reframeOf?: number;
 }
 
 export interface GenerateResult {

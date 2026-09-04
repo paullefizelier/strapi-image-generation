@@ -42,6 +42,22 @@ close, reopen, hunt for the file.
 > internals ever move, the wrapper is not registered at all: a media field that
 > lost its picker would be far worse than a missing button.
 
+### One visual, several aspect ratios
+
+Tick the extra ratios and the same image comes back as a 16:9 hero, a 4:3 card
+and a 9:16 mobile.
+
+Each one is a **retouch of the first image**, not a second run of the prompt:
+the API draws one ratio per call, and running the same description again at
+another ratio returns a *different photograph* — fine as a variation, useless as
+a declination. Here the model extends the scene it already drew, so the set
+belongs together.
+
+Every ratio is a charged render, so the button says the total before you commit
+to it. The calls go one at a time from the browser: four 55-second renders in a
+single request would pass the proxy timeout, and this way a failure on the third
+ratio does not cost you the first two.
+
 ### Titles that are safe to publish
 
 The file name ends up in the asset's **public URL**, so naming a generated file
@@ -153,7 +169,7 @@ permission.
 | Route | Permission | |
 |---|---|---|
 | `GET /image-gen/catalogue` | `generate` | Models, sizes, prices, ratios |
-| `POST /image-gen/generate` | `generate` | `{ prompt, title?, model?, imageSize?, aspectRatio?, referenceFileIds?, previousInteractionId? }` |
+| `POST /image-gen/generate` | `generate` | `{ prompt, title?, model?, imageSize?, aspectRatio?, referenceFileIds?, previousInteractionId? }`<br>or `{ reframeOf, aspectRatio }` to decline an existing image into another ratio — no prompt, no house style |
 | `GET /image-gen/journal` | `generate` | The provenance log and the running total |
 | `DELETE /image-gen/journal/:fileId` | `generate` | Deletes the asset. 404 for a file this plugin did not generate |
 | `GET /image-gen/settings` | `generate` | Redacted — never returns the key |

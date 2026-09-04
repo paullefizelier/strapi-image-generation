@@ -7,6 +7,35 @@ carry breaking changes.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-09-04
+
+### Added
+
+- **One visual, several aspect ratios.** Tick the extra ratios in the dialog and
+  the same image comes back as a 16:9 hero, a 4:3 card and a 9:16 mobile.
+
+  The naive version of this feature does not work. The API takes ONE
+  `aspect_ratio` per call and returns ONE image, so extra ratios are extra calls
+  either way — but re-running the *prompt* at another ratio returns a **different
+  photograph**, which is useless when what you wanted was one visual in several
+  shapes. So each declination is a retouch of the first image: the model extends
+  the scene it already drew. The house style is deliberately not re-sent, since
+  it is already in those pixels and repeating it invites a redraw.
+
+  The calls are made from the browser, one per ratio, rather than looped
+  server-side: four 55-second renders in a single HTTP request would pass the
+  proxy's own timeout long before finishing. It also means a failure on the
+  third ratio does not lose the first two — the main image is saved, and the
+  ratios that did not come back are named with their reason.
+
+  Each render is billed, so the button says the total up front —
+  *Générer 4 images · $0.536* — and the server refuses a reframe to the ratio
+  the image already has, which would buy an identical picture for the price of a
+  render. Declinations are named after their source (`Cariste en entrepôt
+  (9:16)`), so a set reads as one family in the library, and the history shows
+  them as declinations rather than as the English reframe instruction.
+
+
 ## [0.3.0] — 2026-09-03
 
 ### Added

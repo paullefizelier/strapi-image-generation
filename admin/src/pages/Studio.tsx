@@ -171,7 +171,14 @@ const Studio = () => {
                       <Flex direction="column" alignItems="start" gap={1} flex="1">
                         <Typography fontWeight="bold">{entry.fileName}</Typography>
                         <Typography variant="pi" textColor="neutral600">
-                          {entry.prompt}
+                          {entry.derivedFromFileId
+                            ? t("studio.derived", "{ratio} declination of “{name}”", {
+                                ratio: entry.aspectRatio,
+                                name:
+                                  entries.find((item) => item.fileId === entry.derivedFromFileId)
+                                    ?.fileName ?? t("studio.derived-gone", "a deleted image"),
+                              })
+                            : entry.prompt}
                         </Typography>
                         <Typography variant="pi" textColor="neutral500">
                           {entry.model} · {entry.imageSize} · {entry.aspectRatio}

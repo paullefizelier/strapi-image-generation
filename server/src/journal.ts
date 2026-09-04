@@ -32,6 +32,12 @@ export interface JournalEntry {
   style?: string;
   /** Upload ids the retouch worked from; empty for a text-to-image. */
   referenceFileIds: number[];
+  /**
+   * Set when this image is another ratio of an existing one. The source entry
+   * holds the description that started the family; this one holds the reframe
+   * instruction, which is what actually produced these pixels.
+   */
+  derivedFromFileId?: number;
   /** USD, or null when the model/size pair carries no known price. */
   estimatedCost: number | null;
   userId?: number | string;

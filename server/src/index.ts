@@ -1,5 +1,6 @@
 import type { Core } from "@strapi/strapi";
 import { assetNameFor, createAsset, deleteAsset, fileNameFor } from "./assets";
+import { reframeInstruction, reframeTitle } from "./reframe";
 import { ensureFolder } from "./folder";
 import {
   appendJournal,
@@ -90,6 +91,11 @@ interface GenerateBody {
   outputMimeType?: string;
   /** Names the asset. Empty asks the model for a short neutral one. */
   title?: string;
+  /**
+   * Upload id of an image to decline into `aspectRatio`, instead of drawing
+   * from a description. See the reframe branch below.
+   */
+  reframeOf?: number;
 }
 
 interface Ctx<B = unknown> {
@@ -118,8 +124,21 @@ const controllers = {
       const settings = await resolveSettings(strapi);
       const maxPrompt = strapi.plugin("image-gen").config("maxPromptLength", DEFAULT_MAX_PROMPT) as number;
 
+      /**
+       * A declination: reframe an image that already exists, rather than draw
+       * from a description. The API takes ONE ratio per call, so "also give me
+       * a 9:16" is a second charged render either way — but re-running the
+       * prompt at another ratio returns a DIFFERENT photograph, which is
+       * useless when what you want is one visual in several shapes. So the
+       * source image is sent back in and extended.
+       */
+      const reframeOf =
+        Number.isInteger(body.reframeOf) && Number(body.reframeOf) > 0
+          ? Number(body.reframeOf)
+          : null;
+
       const prompt = String(body.prompt ?? "").trim();
-      if (!prompt) ctx.throw(400, "A prompt is required");
+      if (!reframeOf && !prompt) ctx.throw(400, "A prompt is required");
       // Measures what the editor typed: the house style is not their budget.
       if (prompt.length > maxPrompt) {
         ctx.throw(400, `The prompt is longer than the ${maxPrompt}-character limit`);
@@ -128,8 +147,14 @@ const controllers = {
       const model = body.model ?? settings.model;
       const imageSize = body.imageSize ?? settings.imageSize;
       const aspectRatio = body.aspectRatio ?? settings.aspectRatio;
-      const referenceFileIds = Array.isArray(body.referenceFileIds) ? body.referenceFileIds : [];
-      const style = body.useStyle === false ? "" : settings.stylePrompt;
+      const referenceFileIds = reframeOf
+        ? [reframeOf]
+        : Array.isArray(body.referenceFileIds)
+          ? body.referenceFileIds
+          : [];
+      // A reframe carries no style: it is already baked into the source image,
+      // and sending it again only invites the model to redraw rather than extend.
+      const style = reframeOf || body.useStyle === false ? "" : settings.stylePrompt;
       // Each model declares what it can emit — Pro rejects PNG outright.
       const outputMimeType = body.outputMimeType ?? defaultMimeFor(model) ?? "image/jpeg";
 
@@ -144,6 +169,15 @@ const controllers = {
       });
       if (errors.length) ctx.throw(400, errors.join("; "));
 
+      // Reframing to the ratio it already has buys an identical image for the
+      // price of a render. The browser does not offer it; the server refuses it.
+      if (reframeOf) {
+        const source = (await readJournal(strapi)).find((entry) => entry.fileId === reframeOf);
+        if (source?.aspectRatio === aspectRatio) {
+          ctx.throw(400, `That image is already ${aspectRatio}`);
+        }
+      }
+
       let references;
       try {
         references = await loadReferences(strapi, referenceFileIds);
@@ -151,13 +185,15 @@ const controllers = {
         ctx.throw(400, (err as Error).message);
       }
 
+      const sentPrompt = reframeOf ? reframeInstruction(aspectRatio) : prompt;
+
       let generated;
       try {
         generated = await generateImage(
           settings.apiKey,
           {
             model,
-            prompt,
+            prompt: sentPrompt,
             style,
             aspectRatio,
             imageSize,
@@ -188,12 +224,19 @@ const controllers = {
        * never lost: it stays in the journal, which is not public.
        */
       const given = sanitizeTitle(String(body.title ?? ""));
-      const suggested = given
-        ? ""
-        : await suggestTitle(settings.apiKey, prompt, {
-            model: strapi.plugin("image-gen").config("titleModel", DEFAULT_TITLE_MODEL) as string,
-          });
-      const name = given || suggested || assetNameFor(prompt);
+      let name: string;
+      if (reframeOf) {
+        // Named after its source, so a set of declinations reads as one family
+        // in the library — and costs no extra call to name.
+        name = given || reframeTitle(references[0]?.name ?? "", aspectRatio);
+      } else {
+        const suggested = given
+          ? ""
+          : await suggestTitle(settings.apiKey, prompt, {
+              model: strapi.plugin("image-gen").config("titleModel", DEFAULT_TITLE_MODEL) as string,
+            });
+        name = given || suggested || assetNameFor(prompt);
+      }
 
       const folderId = await ensureFolder(strapi, settings.folderName, user);
       const asset = await createAsset(strapi, {
@@ -214,8 +257,9 @@ const controllers = {
         model,
         imageSize,
         aspectRatio,
-        prompt,
+        prompt: sentPrompt,
         ...(style ? { style } : {}),
+        ...(reframeOf ? { derivedFromFileId: reframeOf } : {}),
         referenceFileIds: references.map((r) => r.fileId),
         estimatedCost: estimateCost(model, imageSize),
         userId: user?.id,
