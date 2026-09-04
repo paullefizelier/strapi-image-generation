@@ -42,7 +42,11 @@ export const ASPECT_RATIOS: AspectRatio[] = [
 export type OutputMimeType = "image/jpeg" | "image/png";
 
 export interface ModelSpec {
-  id: ModelId;
+  /**
+   * A string, not the `ModelId` union: once `config.models` can add a model,
+   * the id space is open. `ModelId` stays as the names shipped in the box.
+   */
+  id: string;
   label: string;
   /** Sizes this model accepts. Asking for another is rejected by the API. */
   sizes: ImageSize[];
@@ -95,11 +99,106 @@ export const MODELS: ModelSpec[] = [
   },
 ];
 
+/**
+ * When this catalogue was last checked against Google's published models and
+ * prices. It is shown in the UI because these numbers drift under you —
+ * `gemini-2.5-flash-image`, the original Nano Banana, was deprecated mid-build.
+ * A price nobody has verified in a year should look like one.
+ */
+export const CATALOGUE_VERIFIED = "2026-09-04";
+
 export const DEFAULT_MODEL: ModelId = "gemini-3-pro-image";
 export const DEFAULT_SIZE: ImageSize = "2K";
 export const DEFAULT_ASPECT_RATIO: AspectRatio = "16:9";
 
-export const modelById = (id: string): ModelSpec | undefined => MODELS.find((m) => m.id === id);
+/**
+ * The catalogue in force. Starts as the built-in list and is replaced once at
+ * boot when `config.models` carries overrides — so a price change or a model
+ * Google ships next month does not require a release of this plugin.
+ */
+let active: ModelSpec[] = MODELS;
+
+export const catalogue = (): ModelSpec[] => active;
+
+/** Called once from `register`. Exported for tests, which must restore MODELS. */
+export const setCatalogue = (models: ModelSpec[]): void => {
+  active = models;
+};
+
+export const modelById = (id: string): ModelSpec | undefined => active.find((m) => m.id === id);
+
+export type ModelOverrides = Record<string, Partial<ModelSpec> | null>;
+
+const SIZES: ImageSize[] = ["512px", "1K", "2K", "4K"];
+const MIMES: OutputMimeType[] = ["image/jpeg", "image/png"];
+
+function problemsWith(spec: Partial<ModelSpec>, id: string): string[] {
+  const problems: string[] = [];
+  const at = `models["${id}"]`;
+  if (!spec.label || typeof spec.label !== "string") problems.push(`${at}.label is required`);
+  if (!Array.isArray(spec.sizes) || !spec.sizes.length) {
+    problems.push(`${at}.sizes must list at least one size`);
+  } else {
+    const unknown = spec.sizes.filter((size) => !SIZES.includes(size));
+    if (unknown.length) problems.push(`${at}.sizes has unknown ${unknown.join(", ")}`);
+    // A selectable size with no price breaks the promise this plugin makes
+    // loudest: that the cost is on screen before the call.
+    const unpriced = spec.sizes.filter((size) => typeof spec.price?.[size] !== "number");
+    if (unpriced.length) problems.push(`${at}.price is missing ${unpriced.join(", ")}`);
+  }
+  if (!Number.isInteger(spec.maxReferences) || (spec.maxReferences as number) < 0) {
+    problems.push(`${at}.maxReferences must be a whole number`);
+  }
+  if (!Array.isArray(spec.outputMimeTypes) || !spec.outputMimeTypes.length) {
+    problems.push(`${at}.outputMimeTypes must list at least one format`);
+  } else {
+    const unknown = spec.outputMimeTypes.filter((mime) => !MIMES.includes(mime));
+    if (unknown.length) problems.push(`${at}.outputMimeTypes has unknown ${unknown.join(", ")}`);
+  }
+  return problems;
+}
+
+/**
+ * Merge `config.models` over the built-in catalogue.
+ *
+ * A key naming a known model patches it — the common case is a price that
+ * changed. `null` removes one. A key naming an unknown model adds it, and must
+ * then carry a complete, valid spec.
+ *
+ * Throws, so a malformed catalogue stops the boot with an explanation rather
+ * than reaching an editor as a broken dropdown or an unpriced render.
+ */
+export function applyModelOverrides(
+  builtins: ModelSpec[],
+  overrides?: ModelOverrides | null,
+): ModelSpec[] {
+  if (!overrides || typeof overrides !== "object") return builtins;
+
+  const byId = new Map(builtins.map((spec) => [spec.id, spec]));
+  const problems: string[] = [];
+
+  for (const [id, patch] of Object.entries(overrides)) {
+    if (patch === null) {
+      // Removing something already gone is a no-op: a config that outlives a
+      // model's removal from this list must not break the boot.
+      byId.delete(id);
+      continue;
+    }
+    if (!patch || typeof patch !== "object") {
+      problems.push(`models["${id}"] must be an object or null`);
+      continue;
+    }
+    const merged = { ...(byId.get(id) ?? {}), ...patch, id } as ModelSpec;
+    problems.push(...problemsWith(merged, id));
+    byId.set(id, merged);
+  }
+
+  if (!byId.size) problems.push("models leaves no model at all");
+  if (problems.length) {
+    throw new Error(`image-gen: invalid catalogue configuration — ${problems.join("; ")}`);
+  }
+  return [...byId.values()];
+}
 
 /**
  * USD for one image, or null when the pair is not one this catalogue knows.

@@ -7,6 +7,8 @@ A generated file is an **ordinary asset** — thumbnail, responsive formats,
 storage provider, folder. Nothing downstream has to know it was drawn by a
 model: every front end that already reads a media field keeps working unchanged.
 
+![The image studio](docs/screenshots/01-studio.png)
+
 ## What you get
 
 ### Generation and retouching
@@ -17,6 +19,8 @@ change, and get a new asset — the original is never overwritten.
 Retouching is the part that earns its place on a library that is already full:
 recolour a background, extend a photo to 21:9 for a hero, drop a subject onto a
 plain ground for a card.
+
+![The generate dialog, with declinations selected](docs/screenshots/02-dialog.png)
 
 ### Two places to reach it
 
@@ -32,6 +36,8 @@ spent, and dropping the row would quietly lower the running total.
 button (or *Retouch with AI*, when the field already holds one). It fills the
 field directly, which is fewer steps than the picker beside it: no generate,
 close, reopen, hunt for the file.
+
+![The generate button inside a content entry](docs/screenshots/03-in-entry.png)
 
 > **Why not a button in the Media Library itself?** Because Strapi does not
 > allow it. `@strapi/upload` registers neither `injectionZones` nor `apis`, so
@@ -84,6 +90,13 @@ the render will cost. The studio says what has been spent.
 There is no free tier. The catalogue and its prices are served by the plugin,
 so the figure in the UI cannot drift from the one being charged.
 
+### Run a prompt again
+
+Every entry in the studio history has a *Reuse* button: it reopens the dialog
+with that description, model, size and ratio. A declination reuses the
+description that started its family rather than its own recorded prompt, which
+is the reframe instruction the server composed and means nothing on its own.
+
 ### Provenance, not a lost prompt
 
 Every generation is recorded: prompt, model, size, ratio, reference images,
@@ -119,6 +132,21 @@ export default ({ env }) => ({
       folderName: "Generated images",
       titleModel: "gemini-2.0-flash",   // writes the asset title
       maxPromptLength: 2000,
+      models: {
+        // Patch a price without waiting for a release of this plugin…
+        "gemini-3-pro-image": { price: { "1K": 0.15, "2K": 0.15, "4K": 0.26 } },
+        // …drop a model Google retired…
+        "gemini-3.1-flash-lite-image": null,
+        // …or add one it just shipped (a complete spec is required).
+        "gemini-4-image": {
+          label: "Nano Banana 3",
+          sizes: ["1K", "4K"],
+          price: { "1K": 0.1, "4K": 0.3 },
+          maxReferences: 20,
+          outputMimeTypes: ["image/jpeg"],
+          note: "",
+        },
+      },
     },
   },
 });
@@ -143,6 +171,14 @@ that reads like an order ("write prompts for…", "you are an art director") is
 obeyed as one: the model answers with a written brief instead of an image.
 Describe the look — *photographic, direct flash, hard shadows, muted palette* —
 and it behaves. The plugin names this as the likely cause when it happens.
+
+**The prices go stale, and the plugin says so.** They come from Google's
+published pricing and they move — the original Nano Banana was deprecated
+during this plugin's own construction. The dialog states when the list was last
+checked, and turns that line into a warning once it is over six months old.
+`config.models` patches a price, removes a retired model or adds a new one; a
+malformed entry stops the boot with an explanation rather than reaching an
+editor as an unpriced render.
 
 **Every image carries a SynthID watermark.** It is invisible, it identifies the
 image as AI-generated, and Google provides no way to disable it. The dialog says

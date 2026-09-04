@@ -11,6 +11,10 @@ export interface ModelSpec {
 }
 
 export interface Catalogue {
+  /** ISO date the prices were last checked against Google's published list. */
+  verifiedOn: string;
+  /** True when `config.models` has patched the built-in catalogue. */
+  overridden: boolean;
   models: ModelSpec[];
   aspectRatios: string[];
 }

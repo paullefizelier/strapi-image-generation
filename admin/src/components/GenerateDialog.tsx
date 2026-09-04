@@ -18,6 +18,7 @@ import {
 } from "@strapi/design-system";
 import { useStrapiApp } from "@strapi/strapi/admin";
 import { useImageGenApi } from "../api";
+import { isCatalogueStale } from "../catalogue";
 import { getTranslation } from "../getTranslation";
 import type { Asset, Catalogue, ModelSpec, PublicSettings } from "../types";
 
@@ -28,6 +29,20 @@ interface Props {
   onUse?: (asset: Asset) => void;
   /** Pre-loaded references, e.g. the media already in the field being edited. */
   initialReferences?: Asset[];
+  /**
+   * Settings to open with, from a journal entry being reused. Applied on every
+   * open, unlike the defaults, which only fill what the editor has not touched.
+   */
+  preset?: Preset | null;
+}
+
+export interface Preset {
+  prompt: string;
+  model?: string;
+  imageSize?: string;
+  aspectRatio?: string;
+  /** Whether the house style was in force when this prompt was first run. */
+  useStyle?: boolean;
 }
 
 interface MediaLibraryAsset {
@@ -48,7 +63,7 @@ const money = (value: number | null): string =>
  * money and the difference between the cheapest and the most expensive
  * combination here is a factor of seven.
  */
-const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props) => {
+const GenerateDialog = ({ open, onClose, onUse, initialReferences = [], preset }: Props) => {
   const { formatMessage } = useIntl();
   const api = useImageGenApi();
   // The upload plugin registers its picker in the app's component library.
@@ -85,13 +100,22 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props)
     setVariants([]);
     setFailedRatios([]);
     setError("");
+    // A preset replaces what is there; the defaults only fill the blanks, so
+    // reopening the dialog does not undo what the editor was in the middle of.
+    if (preset) {
+      setPrompt(preset.prompt);
+      setTitle("");
+      setExtraRatios([]);
+      setUseStyle(preset.useStyle ?? true);
+    }
     Promise.all([api.getCatalogue(), api.getSettings()])
       .then(([cat, cfg]) => {
         setCatalogue(cat);
         setSettings(cfg);
-        setModel((current) => current || cfg.model);
-        setImageSize((current) => current || cfg.imageSize);
-        setAspectRatio((current) => current || cfg.aspectRatio);
+        // `current` starts as "", which `??` would keep — hence `||`.
+        setModel((current) => preset?.model || current || cfg.model);
+        setImageSize((current) => preset?.imageSize || current || cfg.imageSize);
+        setAspectRatio((current) => preset?.aspectRatio || current || cfg.aspectRatio);
       })
       .catch(() => setError(t("dialog.load-error", "Could not load the image settings.")));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -406,6 +430,28 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [] }: Props)
                   {spec ? (
                     <Typography variant="pi" textColor="neutral600">
                       {spec.note} · {t("dialog.cost", "About {cost} per image", { cost: money(cost) })}
+                    </Typography>
+                  ) : null}
+
+                  {catalogue ? (
+                    <Typography
+                      variant="pi"
+                      textColor={
+                        isCatalogueStale(catalogue.verifiedOn) ? "warning700" : "neutral500"
+                      }
+                    >
+                      {isCatalogueStale(catalogue.verifiedOn)
+                        ? t(
+                            "dialog.prices-stale",
+                            "These prices were last checked on {date} and may have moved since. They can be corrected in config.models.",
+                            { date: catalogue.verifiedOn },
+                          )
+                        : t("dialog.prices-checked", "Prices checked on {date}", {
+                            date: catalogue.verifiedOn,
+                          })}
+                      {catalogue.overridden
+                        ? ` · ${t("dialog.prices-overridden", "adjusted by this project's configuration")}`
+                        : ""}
                     </Typography>
                   ) : null}
 

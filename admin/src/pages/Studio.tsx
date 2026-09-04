@@ -13,9 +13,10 @@ import {
 } from "@strapi/design-system";
 import { Trash } from "@strapi/icons";
 import { Layouts, Page, useNotification, useStrapiApp } from "@strapi/strapi/admin";
-import GenerateDialog from "../components/GenerateDialog";
+import GenerateDialog, { type Preset } from "../components/GenerateDialog";
 import { useImageGenApi } from "../api";
 import { integration } from "../integration";
+import { presetFor } from "../preset";
 import { getTranslation } from "../getTranslation";
 import type { Health, JournalEntry, PublicSettings } from "../types";
 
@@ -81,6 +82,7 @@ const Studio = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPicker, health]);
   const [deleting, setDeleting] = React.useState<number | null>(null);
+  const [preset, setPreset] = React.useState<Preset | null>(null);
 
   // Deleted images leave the list but stay in the count and the total: the
   // asset is gone, the money was still spent.
@@ -144,7 +146,13 @@ const Studio = () => {
           "Generate or retouch images. Everything lands in the Media Library as an ordinary asset.",
         )}
         primaryAction={
-          <Button onClick={() => setOpen(true)} disabled={!settings?.configured}>
+          <Button
+            onClick={() => {
+              setPreset(null);
+              setOpen(true);
+            }}
+            disabled={!settings?.configured}
+          >
             {t("studio.new", "New image")}
           </Button>
         }
@@ -267,6 +275,20 @@ const Studio = () => {
                         </Typography>
                       </Flex>
 
+                      {presetFor(entry, entries) ? (
+                        <Button
+                          variant="tertiary"
+                          size="S"
+                          disabled={!settings?.configured}
+                          onClick={() => {
+                            setPreset(presetFor(entry, entries));
+                            setOpen(true);
+                          }}
+                        >
+                          {t("studio.reuse", "Reuse")}
+                        </Button>
+                      ) : null}
+
                       <Dialog.Root>
                         <Dialog.Trigger>
                           <IconButton
@@ -318,6 +340,7 @@ const Studio = () => {
 
       <GenerateDialog
         open={open}
+        preset={preset}
         onClose={() => {
           setOpen(false);
           void load();

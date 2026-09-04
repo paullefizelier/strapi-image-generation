@@ -1,24 +1,26 @@
 {
   "name": "strapi-plugin-image-gen",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Generate and retouch Media Library images from inside Strapi, with Google's Nano Banana models. Generated files become ordinary assets — thumbnails, responsive formats, provider storage.",
   "keywords": [
     "strapi",
+    "strapi-plugin",
     "plugin",
     "media-library",
     "image-generation",
     "nano-banana",
-    "gemini"
+    "gemini",
+    "ai"
   ],
   "license": "MIT",
   "author": "Paul Lefizelier",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/paullefizelier/strapi-plugin-image-gen.git"
+    "url": "git+https://github.com/paullefizelier/strapi-image-generation.git"
   },
-  "homepage": "https://github.com/paullefizelier/strapi-plugin-image-gen#readme",
+  "homepage": "https://github.com/paullefizelier/strapi-image-generation#readme",
   "bugs": {
-    "url": "https://github.com/paullefizelier/strapi-plugin-image-gen/issues"
+    "url": "https://github.com/paullefizelier/strapi-image-generation/issues"
   },
   "type": "commonjs",
   "exports": {

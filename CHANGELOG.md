@@ -7,6 +7,42 @@ carry breaking changes.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-09-04
+
+### Added
+
+- **Run a prompt again from the history.** Every studio entry has a *Reuse*
+  button that reopens the dialog with that description, model, size and ratio.
+
+  A declination is the awkward case: its recorded prompt is the English reframe
+  instruction the server composed, not a description of anything, so it reuses
+  the description that started its family — at its own ratio, which is what the
+  editor is looking at when they click. A declination whose source has fallen
+  out of the capped journal offers no button at all, rather than a prompt that
+  means nothing.
+
+- **The price list can be corrected without a release.** `config.models` patches
+  a price on a known model, removes one Google retired, or adds one it just
+  shipped. A malformed entry stops the boot with an explanation rather than
+  reaching an editor as a broken dropdown or an unpriced render, and a size a
+  model can be asked for must carry a price — the promise this plugin makes
+  loudest is that the cost is on screen before the call.
+
+- **The dialog says when those prices were last checked**, and turns that line
+  into a warning past six months. They drift: the original Nano Banana was
+  deprecated during this plugin's own construction.
+
+### Fixed
+
+- **The npm page's Repository, Homepage and Issues links were 404s.** They named
+  `strapi-plugin-image-gen`; the repository is `strapi-image-generation`.
+
+### Changed
+
+- `ModelSpec.id` is a `string` rather than a closed union. Once the catalogue is
+  configurable, the id space is open — `ModelId` still names what ships in the box.
+
+
 ## [0.5.0] — 2026-09-04
 
 ### Added

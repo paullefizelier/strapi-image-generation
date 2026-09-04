@@ -17,7 +17,12 @@ import {
   DEFAULT_SIZE,
   defaultMimeFor,
   estimateCost,
+  applyModelOverrides,
+  catalogue,
+  CATALOGUE_VERIFIED,
   MODELS,
+  setCatalogue,
+  type ModelOverrides,
   validateRequest,
 } from "./models";
 import { DEFAULT_REQUEST_TIMEOUT_MS, generateImage } from "./nanobanana";
@@ -113,8 +118,12 @@ const controllers = {
   catalogue: () => ({
     async get(ctx: Ctx) {
       ctx.body = {
-        models: MODELS,
+        models: catalogue(),
         aspectRatios: ASPECT_RATIOS,
+        // Shown in the UI: these prices drift, and one nobody has checked in a
+        // year should look like one.
+        verifiedOn: CATALOGUE_VERIFIED,
+        overridden: catalogue() !== MODELS,
       };
     },
   }),
@@ -380,6 +389,16 @@ export default {
   config,
   controllers,
   routes,
+
+  /**
+   * The catalogue is settled once, here, so every later lookup — validation,
+   * pricing, the admin dropdown — reads one authority. A malformed override
+   * throws and stops the boot: better than an editor meeting an unpriced render.
+   */
+  register({ strapi }: { strapi: Core.Strapi }) {
+    const overrides = strapi.plugin("image-gen").config("models") as ModelOverrides | undefined;
+    setCatalogue(applyModelOverrides(MODELS, overrides));
+  },
 
   async bootstrap({ strapi }: { strapi: Core.Strapi }) {
     await strapi.service("admin::permission").actionProvider.registerMany([
