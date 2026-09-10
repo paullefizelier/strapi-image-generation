@@ -7,6 +7,21 @@ carry breaking changes.
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-09-10
+
+### Fixed
+
+- **Three broken images at the top of the npm page.** 0.6.0 shipped a README
+  referencing screenshots that do not exist yet — npm renders the README and
+  resolves relative image paths against the repository, so the listing opened on
+  three broken images. The references are gone until the files exist.
+
+  The brief in `docs/screenshots/` now records why they cannot simply be taken
+  from a working install: the history is a list of real prompts, a customised
+  admin carries its owner's accent colour inside the frame, and a deployed
+  install lags the release it is meant to illustrate.
+
+
 ## [0.6.0] — 2026-09-04
 
 ### Added

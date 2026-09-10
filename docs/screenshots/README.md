@@ -3,9 +3,24 @@
 Four images, in this order — they are what the README and the Strapi Marketplace
 listing show, so they are the first thing anyone sees of this plugin.
 
-Shoot them in a **clean project** at 1440×900, light theme, with the browser
-chrome cropped out. Nothing confidential in the frame: no client names in the
-Media Library, no real prompts about real people.
+Shoot them in a **throwaway Strapi project** at 1440×900, light theme, browser
+chrome cropped out. Not in a working install — that was tried, and all three
+reasons it failed are worth writing down:
+
+- **The prompts are the screenshot.** A real studio history is a list of real
+  prompts. The one we looked at described people by age and nationality and
+  asked to remove a third party's brand from a jacket. Shot 01 *is* that list;
+  there is no framing that removes it.
+- **A customised admin carries its owner's brand.** The logo sits in the sidebar
+  and crops away, but the accent colour is on the buttons, the badges and the
+  active icon, all inside the frame. Strapi's default violet says "Strapi
+  plugin"; anything else says "someone's install".
+- **A deployed install lags the release.** The one we looked at ran 0.5.0 while
+  the README documented 0.6.0, so the shots would have been missing features the
+  page describes.
+
+So: a fresh project, default theme, and three neutral prompts generated for the
+purpose — a warehouse, a workshop, a building site. About $0.40 of renders.
 
 | File | Screen | What must be visible |
 |---|---|---|

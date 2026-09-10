@@ -7,8 +7,6 @@ A generated file is an **ordinary asset** — thumbnail, responsive formats,
 storage provider, folder. Nothing downstream has to know it was drawn by a
 model: every front end that already reads a media field keeps working unchanged.
 
-![The image studio](docs/screenshots/01-studio.png)
-
 ## What you get
 
 ### Generation and retouching
@@ -19,8 +17,6 @@ change, and get a new asset — the original is never overwritten.
 Retouching is the part that earns its place on a library that is already full:
 recolour a background, extend a photo to 21:9 for a hero, drop a subject onto a
 plain ground for a card.
-
-![The generate dialog, with declinations selected](docs/screenshots/02-dialog.png)
 
 ### Two places to reach it
 
@@ -36,8 +32,6 @@ spent, and dropping the row would quietly lower the running total.
 button (or *Retouch with AI*, when the field already holds one). It fills the
 field directly, which is fewer steps than the picker beside it: no generate,
 close, reopen, hunt for the file.
-
-![The generate button inside a content entry](docs/screenshots/03-in-entry.png)
 
 > **Why not a button in the Media Library itself?** Because Strapi does not
 > allow it. `@strapi/upload` registers neither `injectionZones` nor `apis`, so
