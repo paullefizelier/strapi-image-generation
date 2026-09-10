@@ -20,6 +20,12 @@ export interface JournalEntry {
   fileDocumentId?: string;
   fileName: string;
   fileUrl?: string;
+  /**
+   * The thumbnail Strapi generated, so a grid of past images does not download
+   * the originals. Absent on entries written before 0.9.0 — the studio falls
+   * back to `fileUrl` for those.
+   */
+  thumbnailUrl?: string;
   model: string;
   imageSize: string;
   aspectRatio: string;

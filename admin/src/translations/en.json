@@ -102,6 +102,7 @@
   "studio.prompt-title": "Description",
   "studio.reuse": "Reuse",
   "studio.search": "Search a description, a name, a ratio…",
+  "studio.search-label": "Search the history",
   "studio.spent": "${amount} spent",
   "studio.spent-month": "${amount} this month",
   "studio.strapi-version": "Strapi {running}, verified against {tested}",

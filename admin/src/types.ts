@@ -53,6 +53,8 @@ export interface JournalEntry {
   fileDocumentId?: string;
   fileName: string;
   fileUrl?: string;
+  /** Absent on entries written before 0.9.0; fall back to fileUrl. */
+  thumbnailUrl?: string;
   model: string;
   imageSize: string;
   aspectRatio: string;

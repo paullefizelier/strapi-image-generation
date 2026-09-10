@@ -13,6 +13,7 @@ import {
   Modal,
   TextInput,
   Typography,
+  VisuallyHidden,
 } from "@strapi/design-system";
 import { ExternalLink, Folder, Search, Trash } from "@strapi/icons";
 import { Layouts, Page, useNotification, useStrapiApp } from "@strapi/strapi/admin";
@@ -225,10 +226,11 @@ const Studio = () => {
             }}
             aria-label={t("studio.view", "See “{name}” in full", { name: primary.fileName })}
           >
-            {primary.fileUrl ? (
+            {primary.thumbnailUrl ?? primary.fileUrl ? (
               <img
-                src={primary.fileUrl}
+                src={primary.thumbnailUrl ?? primary.fileUrl}
                 alt=""
+                loading="lazy"
                 style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }}
               />
             ) : null}
@@ -381,6 +383,11 @@ const Studio = () => {
 
             {families.length ? (
               <Field.Root name="search">
+                {/* A placeholder is not a label: it disappears the moment you
+                    type, and screen readers do not treat it as one. */}
+                <VisuallyHidden>
+                  <Field.Label>{t("studio.search-label", "Search the history")}</Field.Label>
+                </VisuallyHidden>
                 <TextInput
                   value={query}
                   placeholder={t("studio.search", "Search a description, a name, a ratio…")}

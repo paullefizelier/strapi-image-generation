@@ -7,6 +7,33 @@ carry breaking changes.
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-09-10
+
+### Fixed
+
+- **The new grid downloaded full-size originals.** 0.8.0 made the images big
+  enough to recognise but kept pointing at `fileUrl`, which is the original — a
+  2K or 4K JPEG — to fill a 220px card. Fifty-six cards meant tens of megabytes
+  on every visit to the studio, and the journal holds up to 500.
+
+  The thumbnail Strapi already generates is now recorded alongside the original
+  and used for the cards; the full view still shows the original. Entries
+  written before this release have no thumbnail and fall back, so old history
+  stays visible. Images also load lazily now.
+
+- **The search field had no label**, only a placeholder — which disappears the
+  moment you type and is not announced as a label. It has a real one, visually
+  hidden.
+
+### Added
+
+- **The route guards have tests.** `journal.remove` is the one place a
+  permission named "generate and retouch images" can delete a file, so what it
+  refuses matters: a file this plugin did not generate is a 404, and a
+  non-positive or non-integer id is a 400, with the upload service never
+  reached. That guard had no coverage at all.
+
+
 ## [0.8.0] — 2026-09-10
 
 ### Changed

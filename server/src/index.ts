@@ -264,6 +264,9 @@ const controllers = {
         fileDocumentId: asset.documentId,
         fileName: asset.name,
         fileUrl: asset.url,
+        // The studio shows a grid; without this it would fetch full 2K and 4K
+        // originals to fill 220px cards.
+        ...(asset.formats?.thumbnail?.url ? { thumbnailUrl: asset.formats.thumbnail.url } : {}),
         model,
         imageSize,
         aspectRatio,

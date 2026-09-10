@@ -68,7 +68,8 @@ export interface CreatedAsset {
   mime: string;
   width?: number;
   height?: number;
-  formats?: unknown;
+  /** Responsive variants the upload service built. `thumbnail` is ~156px wide. */
+  formats?: Record<string, { url?: string } | undefined> | null;
 }
 
 export async function createAsset(
