@@ -20,8 +20,12 @@ plain ground for a card.
 
 ### Two places to reach it
 
-**Settings → Image studio** — the full screen: generate, retouch, and the
-history of everything generated so far.
+**Settings → Image studio** — the full screen: generate, retouch, and a grid of
+everything generated so far. A visual and its declinations share one card;
+clicking any image opens it in full with the description that made it, its
+model, size, ratio, cost and date, and links to the file and to its Media
+Library folder. The history is searchable by description, name, model or ratio,
+accents folded.
 
 Generated images can also be **deleted from the studio**, with a confirmation:
 the asset goes for good, and content still pointing at it loses its image. The

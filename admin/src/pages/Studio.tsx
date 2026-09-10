@@ -5,16 +5,21 @@ import {
   Box,
   Button,
   Dialog,
+  Field,
   Flex,
   IconButton,
   Loader,
   Main,
+  Modal,
+  TextInput,
   Typography,
 } from "@strapi/design-system";
-import { Trash } from "@strapi/icons";
+import { ExternalLink, Folder, Search, Trash } from "@strapi/icons";
 import { Layouts, Page, useNotification, useStrapiApp } from "@strapi/strapi/admin";
 import GenerateDialog, { type Preset } from "../components/GenerateDialog";
+import RatioGlyph from "../components/RatioGlyph";
 import { useImageGenApi } from "../api";
+import { groupFamilies, searchFamilies, spentSince, startOfMonth, type Family } from "../history";
 import { integration } from "../integration";
 import { presetFor } from "../preset";
 import { getTranslation } from "../getTranslation";
@@ -23,9 +28,13 @@ import type { Health, JournalEntry, PublicSettings } from "../types";
 /**
  * The studio: generate or retouch, and see what has already been generated.
  *
- * The history is not decoration — it is the provenance log. It answers "how was
- * this image made", lets a prompt be reused, and shows what the feature has
- * cost so far, which is the number nobody thinks to ask for until the invoice.
+ * A grid, not a list. The first version rendered the journal exactly as it is
+ * stored — a row per entry, text before image, a 96px thumbnail — which asked
+ * people to READ a tool whose whole subject is what things look like. It also
+ * showed a hero and its three declinations as four unrelated rows.
+ *
+ * So: one card per family, images at a size you can recognise, and the whole
+ * provenance a click away rather than crammed into the row.
  */
 const Studio = () => {
   const { formatMessage } = useIntl();
@@ -41,15 +50,48 @@ const Studio = () => {
   const [entries, setEntries] = React.useState<JournalEntry[]>([]);
   const [spent, setSpent] = React.useState(0);
   const [health, setHealth] = React.useState<Health | null>(null);
+  const [deleting, setDeleting] = React.useState<number | null>(null);
+  const [preset, setPreset] = React.useState<Preset | null>(null);
+  const [query, setQuery] = React.useState("");
+  /** The entry shown large, with its full prompt and its links. */
+  const [viewing, setViewing] = React.useState<JournalEntry | null>(null);
 
   /**
    * The plugin hooks into Strapi internals that no version promises. When one
-   * of them moves, the plugin degrades quietly by design — it would rather show
-   * no button than break a media field. Quietly is the problem: this panel is
+   * moves, the plugin degrades quietly by design — it would rather show no
+   * button than break a media field. Quietly is the problem: this panel is
    * where a silent degradation becomes something someone can see.
    */
   const components = useStrapiApp("ImageGenStudio", (state) => state.components);
   const hasPicker = Boolean(components?.["media-library"]);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const [cfg, journal, status] = await Promise.all([
+        api.getSettings(),
+        api.getJournal(),
+        // A failing health check must not hide the studio itself.
+        api.getHealth().catch(() => null),
+      ]);
+      setSettings(cfg);
+      setEntries(journal.entries);
+      setSpent(journal.totalCost);
+      setHealth(status);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  React.useEffect(() => {
+    void load();
+  }, [load]);
+
+  const families = React.useMemo(() => groupFamilies(entries), [entries]);
+  const shown = React.useMemo(() => searchFamilies(families, query), [families, query]);
+  const thisMonth = React.useMemo(() => spentSince(entries, startOfMonth()), [entries]);
+  const deletedCount = entries.filter((entry) => entry.deletedAt).length;
 
   const integrationIssues = React.useMemo(() => {
     const issues: string[] = [];
@@ -81,36 +123,6 @@ const Studio = () => {
     return issues;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPicker, health]);
-  const [deleting, setDeleting] = React.useState<number | null>(null);
-  const [preset, setPreset] = React.useState<Preset | null>(null);
-
-  // Deleted images leave the list but stay in the count and the total: the
-  // asset is gone, the money was still spent.
-  const visible = React.useMemo(() => entries.filter((entry) => !entry.deletedAt), [entries]);
-  const deletedCount = entries.length - visible.length;
-
-  const load = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      const [cfg, journal, status] = await Promise.all([
-        api.getSettings(),
-        api.getJournal(),
-        // A failing health check must not hide the studio itself.
-        api.getHealth().catch(() => null),
-      ]);
-      setSettings(cfg);
-      setEntries(journal.entries);
-      setSpent(journal.totalCost);
-      setHealth(status);
-    } finally {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  React.useEffect(() => {
-    void load();
-  }, [load]);
 
   const remove = async (entry: JournalEntry) => {
     setDeleting(entry.fileId);
@@ -121,6 +133,7 @@ const Studio = () => {
           item.fileId === entry.fileId ? { ...item, deletedAt: new Date().toISOString() } : item,
         ),
       );
+      setViewing(null);
       toggleNotification({
         type: "success",
         message: t("studio.deleted", "“{name}” has been deleted", { name: entry.fileName }),
@@ -135,6 +148,140 @@ const Studio = () => {
     } finally {
       setDeleting(null);
     }
+  };
+
+  const reuse = (entry: JournalEntry) => {
+    setPreset(presetFor(entry, entries));
+    setViewing(null);
+    setOpen(true);
+  };
+
+  const folderUrl = settings?.folderId ? `/admin/plugins/upload?folder=${settings.folderId}` : null;
+
+  const deleteButton = (entry: JournalEntry, label: string) => (
+    <Dialog.Root>
+      <Dialog.Trigger>
+        <IconButton
+          label={t("studio.delete", "Delete this image")}
+          variant="ghost"
+          disabled={deleting === entry.fileId}
+        >
+          <Trash />
+        </IconButton>
+      </Dialog.Trigger>
+      <Dialog.Content>
+        <Dialog.Header>{t("studio.delete-title", "Delete this image?")}</Dialog.Header>
+        <Dialog.Body>
+          {t(
+            "studio.delete-body",
+            "“{name}” will be removed from the Media Library for good. Any content still pointing at it will lose its image.",
+            { name: label },
+          )}
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Dialog.Cancel>
+            <Button variant="tertiary" fullWidth>
+              {t("studio.cancel", "Cancel")}
+            </Button>
+          </Dialog.Cancel>
+          <Dialog.Action>
+            <Button
+              variant="danger-light"
+              fullWidth
+              startIcon={<Trash />}
+              onClick={() => void remove(entry)}
+            >
+              {t("studio.confirm-delete", "Delete")}
+            </Button>
+          </Dialog.Action>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+
+  const card = (family: Family) => {
+    const { primary, variants } = family;
+    return (
+      <Box
+        key={primary.fileId}
+        background="neutral0"
+        hasRadius
+        shadow="tableShadow"
+        overflow="hidden"
+      >
+        <Flex direction="column" alignItems="stretch" gap={0}>
+          {/* The image is the affordance: click it to see everything about it. */}
+          <Box
+            tag="button"
+            onClick={() => setViewing(primary)}
+            background="neutral100"
+            style={{
+              border: 0,
+              padding: 0,
+              cursor: "pointer",
+              display: "block",
+              width: "100%",
+              aspectRatio: primary.aspectRatio.replace(":", " / "),
+            }}
+            aria-label={t("studio.view", "See “{name}” in full", { name: primary.fileName })}
+          >
+            {primary.fileUrl ? (
+              <img
+                src={primary.fileUrl}
+                alt=""
+                style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : null}
+          </Box>
+
+          <Flex direction="column" alignItems="stretch" gap={2} padding={3}>
+            <Typography fontWeight="bold" ellipsis>
+              {primary.fileName}
+            </Typography>
+            <Typography variant="pi" textColor="neutral500">
+              {primary.imageSize} · {primary.aspectRatio}
+              {primary.estimatedCost !== null ? ` · $${primary.estimatedCost.toFixed(3)}` : ""}
+            </Typography>
+
+            {variants.length ? (
+              <Flex gap={1} wrap="wrap" alignItems="center">
+                <Typography variant="pi" textColor="neutral500">
+                  {t("studio.also-in", "Also")}
+                </Typography>
+                {variants.map((variant) => (
+                  <IconButton
+                    key={variant.fileId}
+                    label={t("studio.view-variant", "See the {ratio} version", {
+                      ratio: variant.aspectRatio,
+                    })}
+                    variant="ghost"
+                    onClick={() => setViewing(variant)}
+                  >
+                    <RatioGlyph ratio={variant.aspectRatio} />
+                  </IconButton>
+                ))}
+              </Flex>
+            ) : null}
+
+            <Flex justifyContent="space-between" alignItems="center">
+              {presetFor(primary, entries) ? (
+                <Button
+                  variant="tertiary"
+                  size="S"
+                  disabled={!settings?.configured}
+                  onClick={() => reuse(primary)}
+                >
+                  {t("studio.reuse", "Reuse")}
+                </Button>
+              ) : (
+                <span />
+              )}
+              {deleteButton(primary, primary.fileName)}
+            </Flex>
+          </Flex>
+        </Flex>
+      </Box>
+    );
   };
 
   return (
@@ -178,6 +325,9 @@ const Studio = () => {
 
             <Flex gap={3} alignItems="center" wrap="wrap">
               <Badge>{t("studio.count", "{count} generated", { count: entries.length })}</Badge>
+              <Badge>
+                {t("studio.spent-month", "${amount} this month", { amount: thisMonth.toFixed(2) })}
+              </Badge>
               <Badge>{t("studio.spent", "${amount} spent", { amount: spent.toFixed(2) })}</Badge>
               {deletedCount ? (
                 <Badge>
@@ -185,9 +335,21 @@ const Studio = () => {
                 </Badge>
               ) : null}
               {settings ? (
-                <Typography variant="pi" textColor="neutral600">
-                  {t("studio.folder", "Saved to “{folder}”", { folder: settings.folderName })}
-                </Typography>
+                folderUrl ? (
+                  <Button
+                    variant="tertiary"
+                    size="S"
+                    startIcon={<Folder />}
+                    tag="a"
+                    href={folderUrl}
+                  >
+                    {settings.folderName}
+                  </Button>
+                ) : (
+                  <Typography variant="pi" textColor="neutral600">
+                    {t("studio.folder", "Saved to “{folder}”", { folder: settings.folderName })}
+                  </Typography>
+                )
               ) : null}
             </Flex>
 
@@ -217,126 +379,126 @@ const Studio = () => {
               </Typography>
             )}
 
-            {visible.length === 0 ? (
+            {families.length ? (
+              <Field.Root name="search">
+                <TextInput
+                  value={query}
+                  placeholder={t("studio.search", "Search a description, a name, a ratio…")}
+                  startAction={<Search />}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
+                />
+              </Field.Root>
+            ) : null}
+
+            {families.length === 0 ? (
               <Page.NoData
                 action={
-                  <Button onClick={() => setOpen(true)} disabled={!settings?.configured}>
+                  <Button
+                    onClick={() => {
+                      setPreset(null);
+                      setOpen(true);
+                    }}
+                    disabled={!settings?.configured}
+                  >
                     {t("studio.new", "New image")}
                   </Button>
                 }
               />
+            ) : shown.length === 0 ? (
+              <Box padding={6} background="neutral100" hasRadius>
+                <Typography textColor="neutral600">
+                  {t("studio.no-match", "Nothing matches “{query}”.", { query })}
+                </Typography>
+              </Box>
             ) : (
-              <Flex direction="column" alignItems="stretch" gap={2}>
-                {visible.map((entry) => (
-                  <Box
-                    key={`${entry.fileId}-${entry.at}`}
-                    padding={3}
-                    background="neutral0"
-                    hasRadius
-                    shadow="tableShadow"
-                  >
-                    <Flex gap={4} alignItems="start">
-                      {entry.fileUrl ? (
-                        <Box
-                          hasRadius
-                          overflow="hidden"
-                          background="neutral100"
-                          style={{ width: 96, flexShrink: 0 }}
-                        >
-                          <img
-                            src={entry.fileUrl}
-                            alt=""
-                            style={{ display: "block", width: "100%", height: "auto" }}
-                          />
-                        </Box>
-                      ) : null}
-                      <Flex direction="column" alignItems="start" gap={1} flex="1">
-                        <Typography fontWeight="bold">{entry.fileName}</Typography>
-                        <Typography variant="pi" textColor="neutral600">
-                          {entry.derivedFromFileId
-                            ? t("studio.derived", "{ratio} declination of “{name}”", {
-                                ratio: entry.aspectRatio,
-                                name:
-                                  entries.find((item) => item.fileId === entry.derivedFromFileId)
-                                    ?.fileName ?? t("studio.derived-gone", "a deleted image"),
-                              })
-                            : entry.prompt}
-                        </Typography>
-                        <Typography variant="pi" textColor="neutral500">
-                          {entry.model} · {entry.imageSize} · {entry.aspectRatio}
-                          {entry.estimatedCost !== null
-                            ? ` · $${entry.estimatedCost.toFixed(3)}`
-                            : ""}
-                          {entry.referenceFileIds.length
-                            ? ` · ${t("studio.from-references", "from {count} reference(s)", {
-                                count: entry.referenceFileIds.length,
-                              })}`
-                            : ""}
-                        </Typography>
-                      </Flex>
-
-                      {presetFor(entry, entries) ? (
-                        <Button
-                          variant="tertiary"
-                          size="S"
-                          disabled={!settings?.configured}
-                          onClick={() => {
-                            setPreset(presetFor(entry, entries));
-                            setOpen(true);
-                          }}
-                        >
-                          {t("studio.reuse", "Reuse")}
-                        </Button>
-                      ) : null}
-
-                      <Dialog.Root>
-                        <Dialog.Trigger>
-                          <IconButton
-                            label={t("studio.delete", "Delete this image")}
-                            variant="ghost"
-                            disabled={deleting === entry.fileId}
-                          >
-                            <Trash />
-                          </IconButton>
-                        </Dialog.Trigger>
-                        <Dialog.Content>
-                          <Dialog.Header>
-                            {t("studio.delete-title", "Delete this image?")}
-                          </Dialog.Header>
-                          <Dialog.Body>
-                            {t(
-                              "studio.delete-body",
-                              "“{name}” will be removed from the Media Library for good. Any content still pointing at it will lose its image.",
-                              { name: entry.fileName },
-                            )}
-                          </Dialog.Body>
-                          <Dialog.Footer>
-                            <Dialog.Cancel>
-                              <Button variant="tertiary" fullWidth>
-                                {t("studio.cancel", "Cancel")}
-                              </Button>
-                            </Dialog.Cancel>
-                            <Dialog.Action>
-                              <Button
-                                variant="danger-light"
-                                fullWidth
-                                startIcon={<Trash />}
-                                onClick={() => void remove(entry)}
-                              >
-                                {t("studio.confirm-delete", "Delete")}
-                              </Button>
-                            </Dialog.Action>
-                          </Dialog.Footer>
-                        </Dialog.Content>
-                      </Dialog.Root>
-                    </Flex>
-                  </Box>
-                ))}
-              </Flex>
+              <Box
+                style={{
+                  display: "grid",
+                  gap: 16,
+                  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                }}
+              >
+                {shown.map(card)}
+              </Box>
             )}
           </Flex>
         )}
       </Layouts.Content>
+
+      {/* One image, everything known about it. */}
+      <Modal.Root open={Boolean(viewing)} onOpenChange={(next: boolean) => !next && setViewing(null)}>
+        <Modal.Content>
+          <Modal.Header>
+            <Typography variant="beta">{viewing?.fileName}</Typography>
+          </Modal.Header>
+          <Modal.Body>
+            {viewing ? (
+              <Flex direction="column" alignItems="stretch" gap={3}>
+                <Box hasRadius overflow="hidden" background="neutral100">
+                  {viewing.fileUrl ? (
+                    <img
+                      src={viewing.fileUrl}
+                      alt=""
+                      style={{ display: "block", width: "100%", height: "auto" }}
+                    />
+                  ) : null}
+                </Box>
+                <Typography variant="sigma" textColor="neutral600">
+                  {viewing.derivedFromFileId
+                    ? t("studio.derived-title", "A {ratio} declination", {
+                        ratio: viewing.aspectRatio,
+                      })
+                    : t("studio.prompt-title", "Description")}
+                </Typography>
+                <Typography>{viewing.prompt}</Typography>
+                <Typography variant="pi" textColor="neutral500">
+                  {viewing.model} · {viewing.imageSize} · {viewing.aspectRatio}
+                  {viewing.estimatedCost !== null
+                    ? ` · $${viewing.estimatedCost.toFixed(3)}`
+                    : ""}
+                  {` · ${new Date(viewing.at).toLocaleString()}`}
+                </Typography>
+                {viewing.style ? (
+                  <Typography variant="pi" textColor="neutral500">
+                    {t("studio.with-style", "Generated with the house style in force at the time.")}
+                  </Typography>
+                ) : null}
+              </Flex>
+            ) : null}
+          </Modal.Body>
+          <Modal.Footer>
+            <Flex gap={2} wrap="wrap">
+              {viewing?.fileUrl ? (
+                <Button
+                  variant="tertiary"
+                  startIcon={<ExternalLink />}
+                  tag="a"
+                  href={viewing.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {t("studio.open-image", "Open the image")}
+                </Button>
+              ) : null}
+              {folderUrl ? (
+                <Button variant="tertiary" startIcon={<Folder />} tag="a" href={folderUrl}>
+                  {t("studio.open-folder", "Open the folder")}
+                </Button>
+              ) : null}
+            </Flex>
+            {viewing ? (
+              <Flex gap={2}>
+                {deleteButton(viewing, viewing.fileName)}
+                {presetFor(viewing, entries) ? (
+                  <Button disabled={!settings?.configured} onClick={() => reuse(viewing)}>
+                    {t("studio.reuse", "Reuse")}
+                  </Button>
+                ) : null}
+              </Flex>
+            ) : null}
+          </Modal.Footer>
+        </Modal.Content>
+      </Modal.Root>
 
       <GenerateDialog
         open={open}

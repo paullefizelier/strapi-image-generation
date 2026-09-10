@@ -7,6 +7,57 @@ carry breaking changes.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-09-10
+
+### Changed
+
+- **The studio is a grid, not a log.** It used to render the journal exactly as
+  it is stored: a row per entry, text before image, a 96px thumbnail. That asked
+  people to *read* a tool whose whole subject is what things look like. Images
+  are now shown at a size you can recognise, one card per visual.
+
+- **A visual and its declinations are one card.** Since one description can
+  produce four assets, the flat list showed four sibling rows of equal weight
+  and left the reader to reassemble the family from a sentence. Declinations now
+  hang off their source as ratio glyphs you can click. A declination whose
+  source has been deleted, or has fallen out of the capped journal, is promoted
+  to its own card rather than vanishing — the asset still exists, and hiding it
+  would make the studio lie about the library.
+
+- **Ratios are drawn, not spelled.** Ten checkboxes reading
+  `1:1 3:2 2:3 3:4 4:3 4:5 5:4 9:16 16:9 21:9` asked for arithmetic in a tool
+  about shape. Each is now a rectangle in its own proportion, never thinner than
+  4px, because a 21:9 glyph three pixels tall reads as a line.
+
+- **Reference images are thumbnails.** You are choosing a picture, and
+  `cariste-entrepot-2026-09-04.jpg` is not one.
+
+- **The house style is clamped to two lines,** with a button to read the rest.
+  Printed in full it ran ten lines — taller than the prompt field — and pushed
+  model, size and ratio below the fold, which is where the decisions are. Still
+  visible rather than collapsed: an invisible prompt modifier is the surest way
+  to make a result inexplicable.
+
+### Added
+
+- **Search the history** by description, file name, model or ratio, with accents
+  folded — nobody types "entrepôt" the same way twice. Matching a declination
+  keeps its whole family on screen.
+
+- **A full view for any image**, with the description that made it, the model,
+  size, ratio, cost and date, and links to the file itself and to its Media
+  Library folder (`?folder=<id>`, which is the parameter the Media Library
+  actually reads). Until now, *using* a generated image meant leaving the studio
+  and hunting for it by name — the loop this plugin exists to close, still open
+  on its last step.
+
+- **Spend for the current month**, beside the all-time total. A number that only
+  ever grows is not one you can act on.
+
+- **Cmd/Ctrl + Enter** generates from the description field. Plain Enter still
+  belongs to the text: prompts have paragraphs.
+
+
 ## [0.7.0] — 2026-09-10
 
 ### Fixed

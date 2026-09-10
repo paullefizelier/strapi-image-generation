@@ -27,6 +27,8 @@ export interface PublicSettings {
   imageSize: string;
   aspectRatio: string;
   folderName: string;
+  /** Null until the first generation creates the folder. */
+  folderId: number | null;
   /** House style folded into every prompt. Empty = none. */
   stylePrompt: string;
 }

@@ -1,7 +1,6 @@
 import * as React from "react";
 import { useIntl } from "react-intl";
 import {
-  Badge,
   Box,
   Button,
   Checkbox,
@@ -20,6 +19,7 @@ import { useStrapiApp } from "@strapi/strapi/admin";
 import { useImageGenApi } from "../api";
 import { isCatalogueStale } from "../catalogue";
 import { runBatch, runReframes } from "../batch";
+import RatioGlyph from "./RatioGlyph";
 import { getTranslation } from "../getTranslation";
 import type { Asset, Catalogue, ModelSpec, PublicSettings } from "../types";
 
@@ -102,6 +102,12 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [], preset }
   const cancelRef = React.useRef(false);
   /** The same fact as the ref, for rendering: a ref change re-renders nothing. */
   const [stopping, setStopping] = React.useState(false);
+  /**
+   * The style is reference material, not a control. Printed in full it ran ten
+   * lines — taller than the prompt field — and pushed model, size and ratio
+   * below the fold, which is where the actual decisions are.
+   */
+  const [styleOpen, setStyleOpen] = React.useState(false);
 
   const stop = () => {
     cancelRef.current = true;
@@ -291,6 +297,29 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [], preset }
                     )}
                   </Typography>
 
+                  <Flex gap={2}>
+                    <Button
+                      variant="tertiary"
+                      size="S"
+                      tag="a"
+                      href={result.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {t("dialog.open-image", "Open the image")}
+                    </Button>
+                    {settings?.folderId ? (
+                      <Button
+                        variant="tertiary"
+                        size="S"
+                        tag="a"
+                        href={`/admin/plugins/upload?folder=${settings.folderId}`}
+                      >
+                        {t("dialog.open-folder", "Open the folder")}
+                      </Button>
+                    ) : null}
+                  </Flex>
+
                   {variants.length ? (
                     <Flex direction="column" alignItems="stretch" gap={2}>
                       <Typography variant="sigma" textColor="neutral600">
@@ -348,6 +377,14 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [], preset }
                       onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
                         setPrompt(e.target.value)
                       }
+                      onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+                        // Plain Enter belongs to the description: prompts have
+                        // paragraphs.
+                        if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canGenerate) {
+                          e.preventDefault();
+                          void generate();
+                        }
+                      }}
                       placeholder={t(
                         "dialog.prompt-placeholder",
                         "A logistics warehouse at golden hour, wide shot, warm light",
@@ -388,14 +425,39 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [], preset }
                           />
                         </Flex>
                         {/* Shown, not hidden: an invisible prompt modifier is the
-                            surest way to make a result inexplicable. */}
+                            surest way to make a result inexplicable. Clamped to
+                            two lines rather than collapsed, though — printed in
+                            full it ran ten lines, taller than the prompt field,
+                            and pushed model, size and ratio below the fold,
+                            which is where the actual decisions are. */}
                         <Typography
                           variant="pi"
                           textColor={useStyle ? "neutral700" : "neutral500"}
-                          style={{ whiteSpace: "pre-wrap" }}
+                          style={
+                            styleOpen
+                              ? { whiteSpace: "pre-wrap" }
+                              : {
+                                  whiteSpace: "pre-wrap",
+                                  display: "-webkit-box",
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: "vertical",
+                                  overflow: "hidden",
+                                }
+                          }
                         >
                           {settings.stylePrompt}
                         </Typography>
+                        <Box>
+                          <Button
+                            variant="tertiary"
+                            size="S"
+                            onClick={() => setStyleOpen((current) => !current)}
+                          >
+                            {styleOpen
+                              ? t("dialog.style-hide", "Show less")
+                              : t("dialog.style-show", "Read the whole style")}
+                          </Button>
+                        </Box>
                         {useStyle ? (
                           <Typography variant="pi" textColor="neutral500">
                             {t("dialog.style-hint", "Added before your description.")}
@@ -435,7 +497,12 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [], preset }
                     </Field.Root>
 
                     <Field.Root name="ratio" style={{ minWidth: 120 }}>
-                      <Field.Label>{t("dialog.ratio", "Aspect ratio")}</Field.Label>
+                      <Field.Label>
+                        <Flex gap={2} alignItems="center">
+                          {t("dialog.ratio", "Aspect ratio")}
+                          <RatioGlyph ratio={aspectRatio} />
+                        </Flex>
+                      </Field.Label>
                       <SingleSelect
                         value={aspectRatio}
                         onChange={(next: string | number) => setAspectRatio(String(next))}
@@ -469,7 +536,10 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [], preset }
                               )
                             }
                           >
-                            {ratio}
+                            <Flex gap={2} alignItems="center">
+                              <RatioGlyph ratio={ratio} max={16} />
+                              {ratio}
+                            </Flex>
                           </Checkbox>
                         ))}
                     </Flex>
@@ -528,11 +598,30 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [], preset }
                       ) : null}
                     </Flex>
                     {references.length ? (
-                      <Flex gap={2} wrap="wrap">
+                      <Flex gap={2} wrap="wrap" alignItems="start">
                         {references.map((reference) => (
-                          <Badge key={reference.id} onClick={() => undefined}>
-                            {reference.name}
-                          </Badge>
+                          // A thumbnail, not the file name: you are picking a
+                          // picture, and "cariste-entrepot-2026-09-04.jpg" is
+                          // not one.
+                          <Box
+                            key={reference.id}
+                            hasRadius
+                            overflow="hidden"
+                            background="neutral100"
+                            style={{ width: 64, height: 64 }}
+                            title={reference.name}
+                          >
+                            <img
+                              src={reference.url}
+                              alt={reference.name}
+                              style={{
+                                display: "block",
+                                width: "100%",
+                                height: "100%",
+                                objectFit: "cover",
+                              }}
+                            />
+                          </Box>
                         ))}
                       </Flex>
                     ) : (

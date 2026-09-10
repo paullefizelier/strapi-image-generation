@@ -1,4 +1,5 @@
 import type { Core } from "@strapi/strapi";
+import { findFolderId } from "./folder";
 import {
   DEFAULT_ASPECT_RATIO,
   DEFAULT_MODEL,
@@ -42,6 +43,13 @@ export interface PublicSettings {
   imageSize: ImageSize;
   aspectRatio: AspectRatio;
   folderName: string;
+  /**
+   * Numeric id of that folder, or null until the first image creates it. The
+   * admin needs it to link into the Media Library — `?folder=<id>` is what
+   * `MediaLibrary.mjs` reads — and the folder is `private` on the file schema,
+   * so the browser cannot look it up itself.
+   */
+  folderId: number | null;
   stylePrompt: string;
 }
 
@@ -129,6 +137,8 @@ export async function resolveSettings(strapi: Core.Strapi): Promise<ResolvedSett
 export async function publicSettings(strapi: Core.Strapi): Promise<PublicSettings> {
   const { apiKey, keySource, model, imageSize, aspectRatio, folderName, stylePrompt } =
     await resolveSettings(strapi);
+  // Looked up, never created: reading the settings must not have side effects.
+  const folderId = await findFolderId(strapi, folderName).catch(() => null);
   return {
     configured: Boolean(apiKey),
     keySource,
@@ -137,6 +147,7 @@ export async function publicSettings(strapi: Core.Strapi): Promise<PublicSetting
     imageSize,
     aspectRatio,
     folderName,
+    folderId,
     stylePrompt,
   };
 }
