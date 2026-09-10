@@ -14,6 +14,7 @@ everything the form asks for, so the submission is one sitting rather than three
       `strapi-image-generation`, so every link on the npm page was a 404.
 - [ ] `keywords` include `strapi` and `strapi-plugin`.
 - [ ] README opens with what the plugin does in two sentences, then screenshots.
+- [x] Listing copy written — `docs/marketplace-copy.md`.
 - [ ] The four screenshots in `docs/screenshots/` exist and match their brief.
 - [x] A logo — `docs/logo.svg` is the source; `docs/logo-160.png` and
       `docs/logo-512.png` are rendered from it with
@@ -29,7 +30,7 @@ everything the form asks for, so the submission is one sitting rather than three
 | Plugin name | Image Gen |
 | npm package | `strapi-plugin-image-gen` |
 | Repository | `https://github.com/paullefizelier/strapi-image-generation` |
-| Description | The `strapi.description` line — one sentence, no marketing |
+| Description | From `marketplace-copy.md` — the short description for the one-liner, the introduction for the body |
 | Categories | Media, AI |
 | Screenshots | `docs/screenshots/01…04` |
 | Logo | `docs/logo-160.png` |
