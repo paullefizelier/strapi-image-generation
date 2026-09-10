@@ -7,6 +7,42 @@ carry breaking changes.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-09-10
+
+### Fixed
+
+- **Closing the dialog mid-run kept spending.** The declination loop had no
+  cancellation: *Cancel* was live during a render, Escape and the overlay closed
+  the dialog too, and the loop carried on issuing paid renders. With Nano Banana
+  Pro at 4K and four extra ratios ticked, that was up to **$0.96 charged after
+  the editor believed they had cancelled** — which makes the cost-before-the-call
+  promise worthless, since stopping did not stop.
+
+  While a run is in flight the button now reads *Stop* and the dialog cannot be
+  closed at all. Stopping means "start nothing further", checked before each
+  render; the render already in flight is deliberately allowed to finish and be
+  saved, because it is paid for either way and throwing away a charged image is
+  the worse outcome.
+
+### Added
+
+- **Generate only the formats that are missing.** A ratio that failed, or one
+  skipped by stopping, can be re-run against the image that already exists —
+  previously the whole batch had to start over, paying for the main image a
+  second time. The button states how many and what they will cost.
+
+### Changed
+
+- **The batch now lives outside the component** (`admin/src/batch.ts`), with
+  eight tests. Money logic that exists only inside a React callback is money
+  logic nobody tests — which is exactly how the bug above survived a release.
+  `GenerateDialog` was the largest admin file and the only one with no coverage.
+
+- CI tests on Node 24, matching what the publish workflow already ships from.
+  Testing on one runtime and releasing from another is a difference nobody wants
+  to discover in production.
+
+
 ## [0.6.1] — 2026-09-10
 
 ### Fixed

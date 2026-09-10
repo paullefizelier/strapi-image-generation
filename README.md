@@ -56,7 +56,14 @@ belongs together.
 Every ratio is a charged render, so the button says the total before you commit
 to it. The calls go one at a time from the browser: four 55-second renders in a
 single request would pass the proxy timeout, and this way a failure on the third
-ratio does not cost you the first two.
+ratio does not cost you the first two — you can re-run just the missing ones
+against the image you already have.
+
+A run can be stopped, and stopping is honest: no further render starts. The one
+already in flight finishes and is saved, because it has been paid for whatever
+you do with it. The dialog cannot be closed while it is working, which was
+previously a way to keep being charged by a batch you thought you had
+cancelled.
 
 ### Titles that are safe to publish
 

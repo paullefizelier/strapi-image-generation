@@ -19,6 +19,7 @@ import {
 import { useStrapiApp } from "@strapi/strapi/admin";
 import { useImageGenApi } from "../api";
 import { isCatalogueStale } from "../catalogue";
+import { runBatch, runReframes } from "../batch";
 import { getTranslation } from "../getTranslation";
 import type { Asset, Catalogue, ModelSpec, PublicSettings } from "../types";
 
@@ -92,6 +93,20 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [], preset }
   const [failedRatios, setFailedRatios] = React.useState<{ ratio: string; message: string }[]>([]);
   /** The ratio being drawn right now, so a run of several is not a blank wait. */
   const [step, setStep] = React.useState("");
+  /** Ratios never attempted, because the editor stopped the run. */
+  const [skipped, setSkipped] = React.useState<string[]>([]);
+  /**
+   * Set by Stop. A ref, not state: the loop reads it between renders and must
+   * see the current value, not the one captured when the run started.
+   */
+  const cancelRef = React.useRef(false);
+  /** The same fact as the ref, for rendering: a ref change re-renders nothing. */
+  const [stopping, setStopping] = React.useState(false);
+
+  const stop = () => {
+    cancelRef.current = true;
+    setStopping(true);
+  };
 
   React.useEffect(() => {
     if (!open) return;
@@ -99,6 +114,7 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [], preset }
     setResult(null);
     setVariants([]);
     setFailedRatios([]);
+    setSkipped([]);
     setError("");
     // A preset replaces what is there; the defaults only fill the blanks, so
     // reopening the dialog does not undo what the editor was in the middle of.
@@ -144,50 +160,73 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [], preset }
       ?.message ?? (err as Error).message;
 
   const generate = async () => {
+    cancelRef.current = false;
+    setStopping(false);
     setBusy(true);
     setError("");
     setVariants([]);
     setFailedRatios([]);
+    setSkipped([]);
     try {
-      setStep(aspectRatio);
-      const { asset } = await api.generate({
-        prompt: prompt.trim(),
-        model,
-        imageSize,
-        aspectRatio,
-        referenceFileIds: references.map((r) => r.id),
-        useStyle,
-        title: title.trim(),
-      });
-      setResult(asset);
-
-      /**
-       * The declinations are separate calls, made here rather than server-side
-       * on purpose: the API draws one ratio per call, and four 55-second
-       * renders inside one HTTP request would pass the proxy's own timeout
-       * long before finishing. One request per ratio also means a failure on
-       * the third does not lose the first two.
-       */
-      const made: Asset[] = [];
-      const missed: { ratio: string; message: string }[] = [];
-      for (const ratio of extraRatios) {
-        setStep(ratio);
-        try {
-          const { asset: variant } = await api.generate({
-            reframeOf: asset.id,
-            aspectRatio: ratio,
-            model,
-            imageSize,
-          });
-          made.push(variant);
-          setVariants([...made]);
-        } catch (err) {
-          missed.push({ ratio, message: messageOf(err) });
-          setFailedRatios([...missed]);
-        }
-      }
+      const outcome = await runBatch(
+        {
+          prompt: prompt.trim(),
+          model,
+          imageSize,
+          aspectRatio,
+          referenceFileIds: references.map((r) => r.id),
+          useStyle,
+          title: title.trim(),
+        },
+        extraRatios,
+        {
+          generate: api.generate,
+          cancelled: () => cancelRef.current,
+          describeError: messageOf,
+          onStep: setStep,
+          onPrimary: setResult,
+          onVariant: (asset) => setVariants((current) => [...current, asset]),
+          onFailed: (ratio, message) =>
+            setFailedRatios((current) => [...current, { ratio, message }]),
+        },
+      );
+      setSkipped(outcome.skipped);
     } catch (err) {
       setError(messageOf(err) || t("dialog.error", "The image could not be generated."));
+    } finally {
+      setBusy(false);
+      setStep("");
+    }
+  };
+
+  /**
+   * Re-run only the ratios that did not arrive. The main image already exists
+   * and is already paid for, so starting over would charge for it twice.
+   */
+  const retryMissing = async () => {
+    if (!result) return;
+    const ratios = [...failedRatios.map((failure) => failure.ratio), ...skipped];
+    cancelRef.current = false;
+    setStopping(false);
+    setBusy(true);
+    setFailedRatios([]);
+    setSkipped([]);
+    try {
+      const outcome = await runReframes(
+        result.id,
+        ratios,
+        { model, imageSize },
+        {
+          generate: api.generate,
+          cancelled: () => cancelRef.current,
+          describeError: messageOf,
+          onStep: setStep,
+          onVariant: (asset) => setVariants((current) => [...current, asset]),
+          onFailed: (ratio, message) =>
+            setFailedRatios((current) => [...current, { ratio, message }]),
+        },
+      );
+      setSkipped(outcome.skipped);
     } finally {
       setBusy(false);
       setStep("");
@@ -205,7 +244,14 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [], preset }
 
   return (
     <>
-      <Modal.Root open={open} onOpenChange={(next: boolean) => !next && onClose()}>
+      <Modal.Root
+        open={open}
+        onOpenChange={(next: boolean) => {
+          // Escape and the overlay used to close mid-run while the loop kept
+          // spending. Stop first, then close.
+          if (!next && !busy) onClose();
+        }}
+      >
         <Modal.Content>
           <Modal.Header>
             <Typography variant="beta">
@@ -270,6 +316,14 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [], preset }
                         ))}
                       </Flex>
                     </Flex>
+                  ) : null}
+
+                  {skipped.length ? (
+                    <Typography variant="pi" textColor="neutral600">
+                      {t("dialog.stopped", "Stopped. Not generated: {ratios}", {
+                        ratios: skipped.join(" · "),
+                      })}
+                    </Typography>
                   ) : null}
 
                   {failedRatios.length ? (
@@ -529,11 +583,33 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [], preset }
           </Modal.Body>
 
           <Modal.Footer>
-            <Button variant="tertiary" onClick={onClose}>
-              {result ? t("common.close", "Close") : t("common.cancel", "Cancel")}
-            </Button>
+            {busy ? (
+              <Button
+                variant="tertiary"
+                onClick={stop}
+                disabled={stopping}
+              >
+                {stopping
+                  ? t("dialog.stopping", "Finishing this one…")
+                  : t("dialog.stop", "Stop")}
+              </Button>
+            ) : (
+              <Button variant="tertiary" onClick={onClose}>
+                {result ? t("common.close", "Close") : t("common.cancel", "Cancel")}
+              </Button>
+            )}
             {result ? (
               <Flex gap={2}>
+                {failedRatios.length + skipped.length > 0 ? (
+                  <Button variant="secondary" onClick={() => void retryMissing()} loading={busy}>
+                    {t("dialog.retry-missing", "Generate the {count} missing · {cost}", {
+                      count: failedRatios.length + skipped.length,
+                      cost: money(
+                        cost === null ? null : cost * (failedRatios.length + skipped.length),
+                      ),
+                    })}
+                  </Button>
+                ) : null}
                 <Button
                   variant="secondary"
                   onClick={() => {
@@ -541,6 +617,7 @@ const GenerateDialog = ({ open, onClose, onUse, initialReferences = [], preset }
                     setReferences([result]);
                     setResult(null);
                   }}
+                  disabled={busy}
                 >
                   {t("dialog.retouch-this", "Retouch this one")}
                 </Button>
