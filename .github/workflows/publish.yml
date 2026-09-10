@@ -1,16 +1,23 @@
 # Publishes to npm when a GitHub release is published.
 #
-# One-time setup: create an npm automation token (npmjs.com → Access Tokens →
-# Automation) and save it as the NPM_TOKEN secret of this repository.
+# Authentication is npm **trusted publishing** (OIDC), not a token: the package
+# is configured on npmjs.com to trust this repository and this workflow file, so
+# there is no NPM_TOKEN to rotate and no two-factor prompt to work around. That
+# last part is why: a classic *Publish* token is refused with EOTP on an account
+# requiring 2FA for writes, which is a failure you only ever see in CI.
+#
+# One-time setup, on the package page: Settings → Trusted publisher → GitHub
+# Actions → this repo + `publish.yml`.
 #
 # Release flow: bump `version` in package.json, commit, then create a GitHub
-# release whose tag matches (v0.1.0). Publishing runs the tests first and
-# attaches npm provenance.
+# release whose tag matches (v0.1.0). `workflow_dispatch` runs the same job
+# against a branch, so the pipeline can be proven without minting a version.
 name: Publish
 
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 jobs:
   publish:
@@ -22,14 +29,21 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          # 24, not 20: Node 20 is end-of-life, and trusted publishing needs
+          # npm >= 11.5, which Node 20 does not ship.
+          node-version: 24
           cache: npm
           registry-url: https://registry.npmjs.org
+      # Belt and braces on the npm version — the OIDC exchange is recent enough
+      # that the bundled one is worth pinning past rather than trusting.
+      - run: npm install -g npm@latest
+      - run: npm -v
       - run: npm ci
       - run: npm test
       # verify needs dist to exist; npm publish rebuilds anyway (prepublishOnly).
       - run: npm run build
       - run: npm run verify
+      # No NODE_AUTH_TOKEN: `id-token: write` above plus the trusted publisher
+      # on npmjs.com is the whole authentication. A token present here would be
+      # used INSTEAD of OIDC, which is how the EOTP loop happened.
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
