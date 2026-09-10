@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Image Gen">
+  <title>Image Gen</title>
+  <!--
+    A picture frame and a spark: the plugin turns a description into an ordinary
+    Media Library asset. Vector, so it stays crisp from 512 down to a 32px
+    favicon and the rounded corner is genuinely transparent.
+
+    The spark sits clear of the frame rather than crossing it. An earlier draft
+    knocked a hole in the frame to make room, which at small sizes read as a
+    broken frame — a rendering fault, not a decision.
+
+    Deliberately not a banana: the model is Google's, the plugin is not, and a
+    fruit reads as unserious on a marketplace shelf. The amber nods at the name
+    without borrowing the brand. Indigo sits the icon in the Strapi ecosystem
+    without impersonating Strapi's own violet, and carries no owner's brand.
+  -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5B4BF5"/>
+      <stop offset="1" stop-color="#8B3DEB"/>
+    </linearGradient>
+    <clipPath id="inside">
+      <rect x="100" y="204" width="256" height="192" rx="22"/>
+    </clipPath>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#tile)"/>
+
+  <!-- The frame -->
+  <rect x="88" y="192" width="280" height="216" rx="32"
+        fill="none" stroke="#fff" stroke-width="24"/>
+
+  <!-- What is in the picture, clipped to sit inside the frame -->
+  <g clip-path="url(#inside)" fill="#fff">
+    <circle cx="158" cy="252" r="25"/>
+    <path d="M100 396 L194 274 L244 334 L296 260 L356 396 Z"/>
+  </g>
+
+  <!-- The spark, and a second smaller one for shimmer -->
+  <path d="M404 56 Q423 117 484 136 Q423 155 404 216 Q385 155 324 136 Q385 117 404 56 Z"
+        fill="#FFC53D"/>
+  <path d="M310 76 Q317 100 341 107 Q317 114 310 138 Q303 114 279 107 Q303 100 310 76 Z"
+        fill="#FFC53D" opacity="0.8"/>
+</svg>

@@ -15,7 +15,10 @@ everything the form asks for, so the submission is one sitting rather than three
 - [ ] `keywords` include `strapi` and `strapi-plugin`.
 - [ ] README opens with what the plugin does in two sentences, then screenshots.
 - [ ] The four screenshots in `docs/screenshots/` exist and match their brief.
-- [ ] A logo, 160×160 PNG on a transparent or white ground.
+- [x] A logo — `docs/logo.svg` is the source; `docs/logo-160.png` and
+      `docs/logo-512.png` are rendered from it with
+      `rsvg-convert -w 160 -h 160 docs/logo.svg -o docs/logo-160.png`.
+      Edit the SVG, never the PNGs.
 
 ## The form
 
@@ -29,6 +32,7 @@ everything the form asks for, so the submission is one sitting rather than three
 | Description | The `strapi.description` line — one sentence, no marketing |
 | Categories | Media, AI |
 | Screenshots | `docs/screenshots/01…04` |
+| Logo | `docs/logo-160.png` |
 
 ## What reviewers push back on
 
